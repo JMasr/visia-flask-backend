@@ -1,0 +1,5 @@
+flask~=2.3.3
+pydantic~=2.4.2
+pymongo~=4.5.0
+mongoengine~=0.26.0
+werkzeug~=2.3.7
