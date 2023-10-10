@@ -3,14 +3,16 @@ import os
 from flask import Flask, request
 from flask_cors import CORS
 from flask_mongoengine import MongoEngine
+from pymongo import MongoClient
 from flask_uploads import UploadSet, configure_uploads, ARCHIVES
 from pymongo.errors import DuplicateKeyError
 
-from config.backend_config import BasicMongoConfig
+from config.backend_config import BasicMongoConfig, BasicSecurityConfig
 from database.basic_mongo import LogActionsMongoDB, VideoActionsMongoDB
 from frontData.basic_record_types import BasicRecordSessionData
 from log.basic_log_types import LogOrigins
 from responses.basic_responses import DataResponse, BasicResponse
+from security.basic_encription import ObjectEncryptor
 from utils.utils import get_now_standard
 
 # from flask_jwt_extended import JWTManager
@@ -31,11 +33,16 @@ CORS(app)
 
 # Sample user data (in a real application, this would come from a database)
 # Configure MongoDB
-mongo_config = BasicMongoConfig(db='visia_demo', username='admin', password='admin')
+mongo_config = BasicMongoConfig(db='visia_demo', username='rootuser', password='rootpass')
 app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
 # Initialize MongoDB
 mongo = MongoEngine()
 mongo.init_app(app)
+
+# Encryption Section
+secrets_path = os.path.join(os.getcwd(), 'secrets/')
+security_config = BasicSecurityConfig(secrets_path)
+encryptor_object = ObjectEncryptor(key=security_config.secret_key)
 
 
 # Error handlers
@@ -63,6 +70,31 @@ def resource_not_found(e):
 @app.route('/')
 def index():  # put application's code here
     return 'Welcome to the backend!'
+
+
+@app.route('/poll')
+def poll():
+    """
+    A simple endpoint to test the connection with the Backend
+    :return: A BasicResponse with the status of the Backend
+    """
+    try:
+        # Initialize a MongoClient
+        client = MongoClient('mongodb://localhost:27017/', serverSelectionTimeoutMS=2000)
+        # Ping the MongoDB server
+        is_up = client.admin.command('ping')
+        # Close the MongoClient
+        client.close()
+
+        if is_up.get("ok") == 1.0:
+            response = BasicResponse(success=True, message="Flask and MongoDB are UP!", status_code=200)
+        else:
+            response = BasicResponse(success=False, message="Flask is UP! and MongoDB is UP but not WORKING!",
+                                     status_code=400)
+    except (Exception or ConnectionError or TimeoutError):
+        response = BasicResponse(success=False, message="Flask is UP! but MongoDB is DOWN!", status_code=503)
+
+    return response.model_dump_json()
 
 
 # Security Section
@@ -211,9 +243,11 @@ def upload_video() -> str:
         # Get the video file from the request
         video = request.files['video']
 
-        # # Save the video file to a specified path
-        # save = os.path.join(upload_files, video.filename)
-        # video.save(save)
+        # Save the video file to a specified path
+        # save = os.path.join(upload_files, f"video.filename.webm")
+
+        video_buffer = video.stream.read()
+        video_encrypted = encryptor_object.encrypt_object(video_buffer)
 
         # Get the data from the request body
         crd_id = request.form.get('crd_id', "UNK")
@@ -221,9 +255,9 @@ def upload_video() -> str:
         file_name = request.form.get('file_name', f"{crd_id}_{patient_id}--{get_now_standard()}.wbm")
 
         # Create a VideoAction
-        video_act = VideoActionsMongoDB(crd_id=crd_id, patient_id=patient_id, filename=file_name, file=video)
+        video_act = VideoActionsMongoDB(crd_id=crd_id, patient_id=patient_id, filename=file_name)
         # Save the video path to MongoDB
-        response = video_act.insert_video(video)
+        response = video_act.insert_video(video_encrypted)
 
         # Log the video upload
         if response.success:
@@ -255,17 +289,19 @@ def download_video():
 
         # TODO: Create a function to download all the videos on videos_obj
         if videos_obj.success and videos_obj.data:
-            #     # Get the video file
-            #     video_file = [video.get("file") for video in videos_obj.data]
-            #
-            #     # Write the video file to a specified path
-            #     if not os.path.exists(upload_files):
-            #         os.makedirs(upload_files)
-            #
-            #     file_name = 'video.webm'
-            #     file_path = os.path.join(upload_files, file_name)
-            #     with open(file_path, 'wb') as f:
-            #         f.write(video_file[0])
+            # Get the video file
+            video_file = [video.get("file") for video in videos_obj.data]
+            video_encrypted = video_file[0]
+            video = encryptor_object.decrypt_object(video_encrypted)
+
+            # Write the video file to a specified path
+            if not os.path.exists(upload_files):
+                os.makedirs(upload_files)
+
+            file_name = 'video.webm'
+            file_path = os.path.join(upload_files, file_name)
+            with open(file_path, 'wb') as f:
+                f.write(video)
 
             response = BasicResponse(success=True, status_code=200, message="Video downloaded successfully")
         else:
