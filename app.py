@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, request
+from flask import Flask, request, redirect
 from flask_cors import CORS
 from flask_mongoengine import MongoEngine
 from pymongo import MongoClient
@@ -206,19 +206,42 @@ def get_logs_by() -> str:
     return response.model_dump_json()
 
 
+# Render section
+record_data = BasicRecordSessionData(patient_id="001-T-PAT", crd_id="001-T-CRD")
+
+
 # Render functions for the frontend
 @app.route('/getRecordData')
 def get_record_session_data():
     try:
-        session_data = BasicRecordSessionData(patient_id="001-T-PAT", crd_id="001-T-CRD")
-        response = DataResponse(success=True, status_code=200, message="Data for Recorod-Session is ready",
-                                data=session_data.model_dump())
+        response = DataResponse(success=True, status_code=200, message="Data for Record-Session is ready",
+                                data=record_data.model_dump())
     except ValueError as e:
         response = DataResponse(success=False, status_code=400, message=f"Value Error: {e}", data={})
     except Exception as e:
         response = DataResponse(success=False, status_code=400, message=f"Error: {e}", data={})
 
     return response.model_dump()
+
+
+@app.route('/video', methods=['GET'])
+def get_render_video():
+    """
+    Endpoint to render a video file from a get request.
+    :return: a redirection to the VideoRecording Frontend service.
+    """
+    try:
+        # Get data from request
+        record_data.crd_id = request.args.get('crd', "UNK")
+        record_data.patient_id = request.args.get('pid', "UNK")
+
+        # Add a log
+        add_log(log_origin=LogOrigins.BACKEND.value, log_type="INFO",
+                message=f"Successful data capture: {record_data.crd_id} - {record_data.patient_id}")
+    except Exception as e:
+        # Add a log
+        add_log(log_origin=LogOrigins.BACKEND.value, log_type="ERROR", message=str(e))
+    return redirect(f"http://localhost:5173/")
 
 
 # Data Handler Section
