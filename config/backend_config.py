@@ -1,3 +1,5 @@
+import pickle
+
 from pydantic import BaseModel
 
 
@@ -16,3 +18,19 @@ class BasicMongoConfig(BaseModel):
                 "password": self.password}
 
         return dump
+
+
+class BasicSecurityConfig:
+    def __init__(self, path_to_secrets: str):
+        self.path_to_secrets: str = path_to_secrets
+        self.fernet_key: bytes = self._load_encryption_key(self.path_to_secrets + 'fernet_key.pickle')
+
+    def _load_encryption_key(self, path_to) -> bytes:
+        """
+        Load the encryption key from the config file.
+        :return: Encryption key as bytes
+        """
+        # Load the encryption key using pickle
+        with open(path_to, 'rb') as file:
+            self.secret_key = pickle.load(file)
+        return self.secret_key
