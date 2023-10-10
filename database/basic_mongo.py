@@ -1,5 +1,5 @@
 from datetime import datetime
-from mongoengine import Document, StringField, DateTimeField, EnumField, FileField
+from mongoengine import Document, StringField, DateTimeField, EnumField, FileField, BinaryField
 from pydantic import BaseModel
 from werkzeug.datastructures import FileStorage
 
@@ -29,14 +29,14 @@ class VideoDocument(Document):
     timestamp = DateTimeField(default=datetime.now())
     # Video
     filename = StringField(required=True)
-    _file = FileField(required=True)
+    _file = BinaryField(required=True)
 
     def get_video(self):
         """
         Get the file from the VideoDocument.
         :return: A binary file.
         """
-        return self._file.read()
+        return self._file
 
 
 # MongoDB actions
@@ -107,7 +107,7 @@ class VideoActionsMongoDB(BaseModel):
     # Video
     filename: str
 
-    def insert_video(self, file: FileStorage) -> BasicResponse:
+    def insert_video(self, file: bytes) -> BasicResponse:
         """
         Insert a Video Object in the MongoDB database.
         :return: A JSON object with a message and a status code.
