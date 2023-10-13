@@ -16,7 +16,6 @@ from security.basic_encription import ObjectEncryptor
 from utils.utils import get_now_standard
 
 # from flask_jwt_extended import JWTManager
-# from security.basic_security import BasicSecurityHandler
 
 # Initialize Flask
 app = Flask(__name__)
@@ -24,14 +23,10 @@ app = Flask(__name__)
 CORS(app)
 
 # Set the secret key to enable JWT authentication
-# security_config = BasicSecurityConfig(secret_key='visia@sergas')
-# app.config['JWT_SECRET_KEY'] = security_config.secret_key
+security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets/'))
+app.config['JWT_SECRET_KEY'] = security_config.secret_key
 # jwt = JWTManager(app)
 
-# security_handler = BasicSecurityHandler(security_config.secret_key)
-
-
-# Sample user data (in a real application, this would come from a database)
 # Configure MongoDB
 mongo_config = BasicMongoConfig(db='visia_demo', username='rootuser', password='rootpass')
 app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
@@ -45,11 +40,12 @@ security_config = BasicSecurityConfig(secrets_path)
 encryptor_object = ObjectEncryptor(key=security_config.secret_key)
 
 
-# Error handlers
+# Endpoints Section
 @app.errorhandler(404)
 def resource_not_found():
     """
     An error-handler to ensure that 404 errors are returned as JSON.
+    :return: A BasicResponse representing a 404 error.
     """
     response = BasicResponse(success=False, status_code=404, message=f"Resource not found: {request.url}")
     return response.model_dump()
@@ -59,16 +55,19 @@ def resource_not_found():
 def resource_not_found(e):
     """
     An error-handler to ensure that MongoDB duplicate key errors are returned as JSON.
+    :return: A BasicResponse representing a duplicate key error from MongoDB.
     """
     response = BasicResponse(success=False, status_code=500, message=f"Duplicate key error: {str(e)}")
     return response.model_dump_json()
 
 
-# Endpoints
 
-# Index
 @app.route('/')
-def index():  # put application's code here
+def index():
+    """
+    A simple endpoint with a welcome message from the Backend.
+    :return: A welcome message from the Backend.
+    """
     return 'Welcome to the backend!'
 
 
