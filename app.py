@@ -23,7 +23,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Set the secret key to enable JWT authentication
-security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets/'))
+security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets'))
 app.config['JWT_SECRET_KEY'] = security_config.secret_key
 # jwt = JWTManager(app)
 
