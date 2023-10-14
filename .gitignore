@@ -4,6 +4,8 @@
 # My project
 secrets/*
 *.pickle
+*.pkl
+*.webm
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
