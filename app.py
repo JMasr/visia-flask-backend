@@ -10,8 +10,8 @@ from pymongo.errors import DuplicateKeyError
 from config.backend_config import BasicMongoConfig, BasicSecurityConfig
 from database.basic_mongo import LogActionsMongoDB, VideoActionsMongoDB
 from frontData.basic_record_types import BasicRecordSessionData
-from log.basic_log_types import LogOrigins
-from responses.basic_responses import DataResponse, BasicResponse
+from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
+from responses.basic_responses import DataResponse, BasicResponse, ListResponse
 from security.basic_encription import ObjectEncryptor
 from utils.utils import get_now_standard
 
@@ -59,7 +59,6 @@ def resource_not_found(e):
     """
     response = BasicResponse(success=False, status_code=500, message=f"Duplicate key error: {str(e)}")
     return response.model_dump_json()
-
 
 
 @app.route('/')
@@ -136,18 +135,15 @@ def add_log(log_origin: str, log_type: str, message: str) -> BasicResponse:
     return response
 
 
-# Endpoint to log data from the frontend
-@app.route('/log/addLogFrontEnd', methods=['POST'])
-def upload_log_frontend() -> str:
+def _upload_log(log_request, log_origin: LogOrigins) -> str:
     """
-    Endpoint to log data from the FrontEnd
+    Function to handle log data upload from the FrontEnd or BackEnd
     :return: A JSON object with a message and a status code.
     """
     try:
         # Get data from request
-        data = request.get_json()
+        data = log_request.get_json()
         # Get data from request body
-        log_origin = LogOrigins.FRONTEND
         log_type = data.get('log_type')
         message = data.get('message')
 
@@ -158,6 +154,16 @@ def upload_log_frontend() -> str:
 
     # Return the response
     return response.model_dump_json()
+
+
+# Endpoint to log data from the frontend
+@app.route('/log/addLogFrontEnd', methods=['POST'])
+def upload_log_frontend() -> str:
+    """
+    Endpoint to log data from the FrontEnd
+    :return: A JSON object with a message and a status code.
+    """
+    return _upload_log(request, LogOrigins.FRONTEND)
 
 
 @app.route('/log/addLogBackEnd', methods=['POST'])
@@ -166,20 +172,7 @@ def upload_log_backend() -> str:
     Endpoint to log data from the BackEnd
     :return: A JSON object with a message and a status code.
     """
-    try:
-        # Get data from request
-        data = request.get_json()
-        # Get data from request body
-        log_origin = LogOrigins.BACKEND
-        log_type = data.get('log_type')
-        message = data.get('message')
-        # Add the log
-        response = add_log(log_origin=log_origin.value, log_type=log_type, message=message)
-    except Exception as e:
-        response = BasicResponse(success=False, status_code=500, message=str(e))
-
-    # Return the response
-    return response.model_dump_json()
+    return _upload_log(request, LogOrigins.BACKEND)
 
 
 # Endpoint to retrieve logs by type
@@ -233,13 +226,11 @@ def get_render_video():
         # Get data from request
         record_data.crd_id = request.args.get('crd', "UNK")
         record_data.patient_id = request.args.get('pid', "UNK")
-
         # Add a log
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type="INFO",
+        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
                 message=f"Successful data capture: {record_data.crd_id} - {record_data.patient_id}")
     except Exception as e:
-        # Add a log
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type="ERROR", message=str(e))
+        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e))
     return redirect(f"http://localhost:5173/")
 
 
@@ -259,7 +250,7 @@ configure_uploads(app, (uploads,))
 def upload_video() -> str:
     """
     Endpoint to upload a video file to the server.
-    :return:
+    :return: A BasicResponse with a message and a status code.
     """
     try:
         # Get the video file from the request
@@ -274,7 +265,7 @@ def upload_video() -> str:
         # Get the data from the request body
         crd_id = request.form.get('crd_id', "UNK")
         patient_id = request.form.get('patient_id', "UNK")
-        file_name = request.form.get('file_name', f"{crd_id}_{patient_id}--{get_now_standard()}.wbm")
+        file_name = request.form.get('file_name', f"{crd_id}--{patient_id}--{get_now_standard()}.webm")
 
         # Create a VideoAction
         video_act = VideoActionsMongoDB(crd_id=crd_id, patient_id=patient_id, filename=file_name)
@@ -283,13 +274,13 @@ def upload_video() -> str:
 
         # Log the video upload
         if response.success:
-            add_log(log_origin=LogOrigins.BACKEND.value, log_type="INFO", message=f"Video uploaded: {file_name}")
+            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message=f"Video uploaded: {file_name}")
         else:
-            add_log(log_origin=LogOrigins.BACKEND.value, log_type="ERROR", message=response.message)
+            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=response.message)
 
     except Exception as e:
         # Add a log
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type="ERROR", message=str(e))
+        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e))
         response = BasicResponse(success=False, status_code=500, message=str(e))
 
     return response.model_dump_json()
@@ -309,29 +300,33 @@ def download_video():
         # Create a VideoAction
         videos_obj = VideoActionsMongoDB.get_videos_by(query)
 
-        # TODO: Create a function to download all the videos on videos_obj
         if videos_obj.success and videos_obj.data:
             # Get the video file
-            video_file = [video.get("file") for video in videos_obj.data]
-            video_encrypted = video_file[0]
-            video = encryptor_object.decrypt_object(video_encrypted)
+            videos_found: list = []
+            for obj_mongo in videos_obj.data:
+                video_name = obj_mongo.get("filename")
+                videos_found.append(video_name)
 
-            # Write the video file to a specified path
-            if not os.path.exists(upload_files):
-                os.makedirs(upload_files)
+                file_mongo = obj_mongo.get("file")
+                video_encrypted = file_mongo.read()
+                video = encryptor_object.decrypt_object(video_encrypted)
 
-            file_name = 'video.webm'
-            file_path = os.path.join(upload_files, file_name)
-            with open(file_path, 'wb') as f:
-                f.write(video)
+                # Write the video file to a specified path
+                if not os.path.exists(upload_files):
+                    os.makedirs(upload_files)
+                file_path = os.path.join(upload_files, video_name)
+                with open(file_path, 'wb') as f:
+                    f.write(video)
 
-            response = BasicResponse(success=True, status_code=200, message="Video downloaded successfully")
+            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Videos downloaded")
+            response = ListResponse(success=True, status_code=200, message="Videos downloaded successfully",
+                                    data=videos_found)
         else:
+            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning, message=videos_obj.message)
             response = BasicResponse(success=False, status_code=400, message="Video/s not found")
 
     except Exception as e:
-        # Add a log
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type="ERROR", message=str(e))
+        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e))
         response = BasicResponse(success=False, status_code=500, message=str(e))
 
     return response.model_dump_json()
