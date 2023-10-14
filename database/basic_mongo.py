@@ -1,7 +1,7 @@
 from datetime import datetime
-from mongoengine import Document, StringField, DateTimeField, EnumField, FileField, BinaryField
+
 from pydantic import BaseModel
-from werkzeug.datastructures import FileStorage
+from mongoengine import Document, StringField, DateTimeField, EnumField, FileField
 
 from log.basic_log_types import LogOrigins, LogTypes
 from responses.basic_responses import BasicResponse, DataResponse, ListResponse
@@ -29,7 +29,7 @@ class VideoDocument(Document):
     timestamp = DateTimeField(default=datetime.now())
     # Video
     filename = StringField(required=True)
-    _file = BinaryField(required=True)
+    _file = FileField(required=True)
 
     def get_video(self):
         """
