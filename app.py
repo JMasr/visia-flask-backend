@@ -270,7 +270,6 @@ def upload_video() -> str:
 
 
 @app.route('/video/downloadBy', methods=['GET'])
-@jwt_required()
 def download_video():
     """
     Endpoint to download a video file from the server.
