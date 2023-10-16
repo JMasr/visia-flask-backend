@@ -25,7 +25,8 @@ class BasicMongoConfig(BaseModel):
 class BasicSecurityConfig:
     def __init__(self, path_to_secrets: str):
         self.path_to_secrets: str = path_to_secrets
-        self.fernet_key: bytes = self._load_encryption_key(os.path.join(self.path_to_secrets, "fernet_key.pkl"))
+        self.backend_key: bytes = self._load_encryption_key(os.path.join(self.path_to_secrets, "backend_key.pkl"))
+        self.frontend_key: bytes = self._load_encryption_key(os.path.join(self.path_to_secrets, "frontend_key.pkl"))
 
     def _load_encryption_key(self, path_to) -> bytes:
         """
