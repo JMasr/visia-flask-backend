@@ -8,14 +8,13 @@ from flask_uploads import UploadSet, configure_uploads, ARCHIVES
 from pymongo.errors import DuplicateKeyError
 
 from config.backend_config import BasicMongoConfig, BasicSecurityConfig
-from database.basic_mongo import LogActionsMongoDB, VideoActionsMongoDB
+from database.basic_mongo import *
 from frontData.basic_record_types import BasicRecordSessionData
 from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
-from responses.basic_responses import DataResponse, BasicResponse, ListResponse
-from security.basic_encription import ObjectEncryptor
+from responses.basic_responses import DataResponse, BasicResponse, ListResponse, TokenResponse
 from utils.utils import get_now_standard
 
-# from flask_jwt_extended import JWTManager
+from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 
 # Initialize Flask
 app = Flask(__name__)
@@ -24,8 +23,8 @@ CORS(app)
 
 # Set the secret key to enable JWT authentication
 security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets'))
-app.config['JWT_SECRET_KEY'] = security_config.secret_key
-# jwt = JWTManager(app)
+app.config['JWT_SECRET_KEY'] = security_config.secret
+jwt = JWTManager(app)
 
 # Configure MongoDB
 mongo_config = BasicMongoConfig(db='visia_demo', username='rootuser', password='rootpass')
@@ -33,11 +32,8 @@ app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
 # Initialize MongoDB
 mongo = MongoEngine()
 mongo.init_app(app)
-
-# Encryption Section
-secrets_path = os.path.join(os.getcwd(), 'secrets/')
-security_config = BasicSecurityConfig(secrets_path)
-encryptor_object = ObjectEncryptor(key=security_config.secret_key)
+# Create a user
+security_config.add_user(username="frontUser", password="frontPass")
 
 
 # Endpoints Section
@@ -96,74 +92,53 @@ def poll():
 
 
 # Security Section
-# @app.route('/getAccessTokenBySecret', methods=['POST'])
-# def get_access_token() -> str:
-#     """
-#     Endpoint to get an access token.
-#     :return: A JSON object with an access token or a message and a status code.
-#     """
-#     # Get data from request
-#     data = request.get_json()
-#     try:
-#         # Get data from request body
-#         secret = data.get('secret')
-#         response = security_handler.getAccessToken(secret)
-#     except Exception as e:
-#         response = BasicResponse(success=False, status_code=500, message=str(e))
-#
-#     return response.model_dump_json()
 
-
-# Log Section
-def add_log(log_origin: str, log_type: str, message: str) -> BasicResponse:
+@app.route('/requestAccessTokenByUser', methods=['POST'])
+def get_access_token_by_secret():
     """
-    Function to log data to MongoDB
-    :param log_origin: Origin of the log.
-    :param log_type: Type of the log.
-    :param message: Message of the log.
-    :return: a BasicResponse object with a message and a status code.
-    """
-    try:
-        # Get data from request body
-        log_action = LogActionsMongoDB(log_origin=log_origin, log_type=log_type, message=message)
-        # Save the log in the database
-        response = log_action.insert_log()
-    except ValueError as e:
-        response = BasicResponse(success=False, status_code=400, message=f'Invalid Value: {e}')
-    except Exception as e:
-        response = BasicResponse(success=False, status_code=500, message=str(e))
-    return response
-
-
-def _upload_log(log_request, log_origin: LogOrigins) -> str:
-    """
-    Function to handle log data upload from the FrontEnd or BackEnd
+    Endpoint to get an access token from the Backend.
     :return: A JSON object with a message and a status code.
     """
     try:
-        # Get data from request
-        data = log_request.get_json()
-        # Get data from request body
-        log_type = data.get('log_type')
-        message = data.get('message')
+        user_name = request.json.get('username', "UNK")
+        user_pass = request.json.get('password', "UNK")
+        front_user = UserDocument.objects(username=user_name).first()
 
-        # Add the log
-        response = add_log(log_origin=log_origin.value, log_type=log_type, message=message)
+        if user_pass == security_config.encryptor_backend.decrypt_object(front_user.password):
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                        message=f"Successful login: {user_name}").save()
+
+            access_token = create_access_token(identity=user_name)
+            refresh_token = create_refresh_token(identity=user_name)
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                        message=f"Tokens created successfully: {user_name}").save()
+
+            response = TokenResponse(success=True, status_code=200, message="Tokens created successfully",
+                                     access_token=access_token, refresh_token=refresh_token)
+        else:
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
+                        message=f"Invalid credentials: {user_name}").save()
+            response = BasicResponse(success=False, status_code=401, message="Invalid credentials")
     except Exception as e:
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
+                    message=f"Error: {e}").save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
-
-    # Return the response
     return response.model_dump_json()
 
 
-# Endpoint to log data from the frontend
+# Log Section
 @app.route('/log/addLogFrontEnd', methods=['POST'])
 def upload_log_frontend() -> str:
     """
     Endpoint to log data from the FrontEnd
     :return: A JSON object with a message and a status code.
     """
-    return _upload_log(request, LogOrigins.FRONTEND)
+    # Get data from request body
+    log_type = request.json.get('log_type')
+    message = request.json.get('message')
+
+    response = LogActionsMongoDB(log_origin=LogOrigins.FRONTEND.value, log_type=log_type, message=message).insert_log()
+    return response.model_dump_json()
 
 
 @app.route('/log/addLogBackEnd', methods=['POST'])
@@ -172,7 +147,12 @@ def upload_log_backend() -> str:
     Endpoint to log data from the BackEnd
     :return: A JSON object with a message and a status code.
     """
-    return _upload_log(request, LogOrigins.BACKEND)
+    # Get data from request body
+    log_type = request.json.get('log_type')
+    message = request.json.get('message')
+
+    response = LogActionsMongoDB(log_origin=LogOrigins.BACKEND.value, log_type=log_type, message=message).insert_log()
+    return response.model_dump_json()
 
 
 # Endpoint to retrieve logs by type
@@ -203,7 +183,7 @@ record_data = BasicRecordSessionData(patient_id="001-T-PAT", crd_id="001-T-CRD")
 
 
 # Render functions for the frontend
-@app.route('/getRecordData')
+@app.route('/render/getRecordData')
 def get_record_session_data():
     try:
         response = DataResponse(success=True, status_code=200, message="Data for Record-Session is ready",
@@ -227,10 +207,10 @@ def get_render_video():
         record_data.crd_id = request.args.get('crd', "UNK")
         record_data.patient_id = request.args.get('pid', "UNK")
         # Add a log
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                message=f"Successful data capture: {record_data.crd_id} - {record_data.patient_id}")
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                    message=f"Video requested: {record_data.crd_id}--{record_data.patient_id}").save()
     except Exception as e:
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e))
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
     return redirect(f"http://localhost:5173/")
 
 
@@ -247,6 +227,7 @@ configure_uploads(app, (uploads,))
 
 
 @app.route('/video/uploads', methods=['POST'])
+@jwt_required()
 def upload_video() -> str:
     """
     Endpoint to upload a video file to the server.
@@ -254,13 +235,13 @@ def upload_video() -> str:
     """
     try:
         # Get the video file from the request
-        video = request.files['video']
+        video = request.files.get('video')
 
         # Save the video file to a specified path
         # save = os.path.join(upload_files, f"video.filename.webm")
 
         video_buffer = video.stream.read()
-        video_encrypted = encryptor_object.encrypt_object(video_buffer)
+        video_encrypted = security_config.encryptor_backend.encrypt_object(video_buffer)
 
         # Get the data from the request body
         crd_id = request.form.get('crd_id', "UNK")
@@ -274,26 +255,29 @@ def upload_video() -> str:
 
         # Log the video upload
         if response.success:
-            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message=f"Video uploaded: {file_name}")
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                        message=f"Video uploaded: {file_name}").save()
         else:
-            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=response.message)
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
+                        message=f"Video not uploaded: {file_name}").save()
 
     except Exception as e:
         # Add a log
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e))
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
 
     return response.model_dump_json()
 
 
 @app.route('/video/downloadBy', methods=['GET'])
+@jwt_required()
 def download_video():
     """
     Endpoint to download a video file from the server.
     :return:
     """
     try:
-        # Get tghe data from the request
+        # Get the data from the request
         data = request.args
         # Get data from request body
         query = {key: value for key, value in data.items() if value != ""}
@@ -309,7 +293,7 @@ def download_video():
 
                 file_mongo = obj_mongo.get("file")
                 video_encrypted = file_mongo.read()
-                video = encryptor_object.decrypt_object(video_encrypted)
+                video = security_config.encryptor_backend.decrypt_object(video_encrypted)
 
                 # Write the video file to a specified path
                 if not os.path.exists(upload_files):
@@ -318,17 +302,29 @@ def download_video():
                 with open(file_path, 'wb') as f:
                     f.write(video)
 
-            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Videos downloaded")
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                        message=f"Video/s downloaded successfully: {videos_found}").save()
             response = ListResponse(success=True, status_code=200, message="Videos downloaded successfully",
                                     data=videos_found)
         else:
-            add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning, message=videos_obj.message)
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
+                        message=f"Video/s not found: {query}").save()
             response = BasicResponse(success=False, status_code=400, message="Video/s not found")
-
     except Exception as e:
-        add_log(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e))
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
 
+    return response.model_dump_json()
+
+
+@app.route("/protected", methods=["GET"])
+@jwt_required()
+def protected():
+    """
+    Endpoint to test JWT authentication.
+    :return: A BasicResponse with a message and a status code.
+    """
+    response = BasicResponse(success=True, status_code=200, message="Access granted")
     return response.model_dump_json()
 
 
