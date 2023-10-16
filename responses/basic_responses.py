@@ -13,3 +13,8 @@ class ListResponse(BasicResponse):
 
 class DataResponse(BasicResponse):
     data: dict
+
+
+class TokenResponse(BasicResponse):
+    access_token: str
+    refresh_token: str
