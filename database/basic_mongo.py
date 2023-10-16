@@ -39,6 +39,11 @@ class VideoDocument(Document):
         return self._file
 
 
+class UserDocument(Document):
+    username = StringField(required=True)
+    password = StringField(required=True)
+
+
 # MongoDB actions
 class LogActionsMongoDB(BaseModel):
     """
@@ -92,6 +97,30 @@ class LogActionsMongoDB(BaseModel):
             response = BasicResponse(success=False, status_code=500, message=str(e))
         # Return the response
         return response
+
+    @staticmethod
+    def upload_log(log_request, log_origin: LogOrigins) -> str:
+        """
+        Function to handle log data upload from the FrontEnd or BackEnd
+        :return: A JSON object with a message and a status code.
+        """
+        try:
+            # Get data from request
+            data = log_request.get_json()
+            # Get data from request body
+            log_type = data.get('log_type')
+            message = data.get('message')
+
+            # Add the log
+            # Get data from request body
+            log_action = LogActionsMongoDB(log_origin=log_origin, log_type=log_type, message=message)
+            # Save the log in the database
+            response = log_action.insert_log()
+        except Exception as e:
+            response = BasicResponse(success=False, status_code=500, message=str(e))
+
+        # Return the response
+        return response.model_dump_json()
 
 
 class VideoActionsMongoDB(BaseModel):
@@ -156,6 +185,51 @@ class VideoActionsMongoDB(BaseModel):
                            "filename": video.filename, "file": video.get_video()} for video in videos]
             response = ListResponse(success=True, status_code=200, message="Videos retrieved successfully",
                                     data=video_data)
+        except Exception as e:
+            response = BasicResponse(success=False, status_code=500, message=str(e))
+        # Return the response
+        return response
+
+
+class UserActionMongoDB(BaseModel):
+    """
+    Class to perform actions with Users on the MongoDB database.
+    """
+    username: str
+    password: str
+
+    def insert_user(self) -> BasicResponse:
+        """
+        Insert a User Object in the MongoDB database.
+        :return: A JSON object with a message and a status code.
+        """
+        try:
+            # Create a User Document
+            new_user = UserDocument(username=self.username, password=self.password)
+            # Save the user in the database
+            id_mongo_db = new_user.save()
+            id_user = str(id_mongo_db.id)
+            # Set the id of the user
+            response = DataResponse(success=True, status_code=200, message="User added: successfully",
+                                    data={"id": id_user})
+        except ValueError as e:
+            response = BasicResponse(success=False, status_code=400, message=f'Invalid Value: {e}')
+        except Exception as e:
+            response = BasicResponse(success=False, status_code=500, message=str(e))
+        # Return the response
+        return response
+
+    def get_user(self) -> BasicResponse:
+        """
+        Get a User Object from the MongoDB database.
+        :return: A JSON object with a message and a status code.
+        """
+        try:
+            # Retrieve user based on the query from MongoDB
+            user = UserDocument.objects(username=self.username)
+            user_data = [{"id": str(user.id), "username": user.username, "password": user.password} for user in user]
+            response = ListResponse(success=True, status_code=200, message="User retrieved successfully",
+                                    data=user_data)
         except Exception as e:
             response = BasicResponse(success=False, status_code=500, message=str(e))
         # Return the response
