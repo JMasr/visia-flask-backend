@@ -27,13 +27,12 @@ app.config['JWT_SECRET_KEY'] = security_config.secret
 jwt = JWTManager(app)
 
 # Configure MongoDB
-mongo_config = BasicMongoConfig(db='visia_demo', username='rootuser', password='rootpass')
+mongo_config = BasicMongoConfig(credentials=os.path.join(os.getcwd(), 'secrets'))
+mongo_config.load_credentials()
 app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
 # Initialize MongoDB
 mongo = MongoEngine()
 mongo.init_app(app)
-# Create a user
-security_config.add_user(username="frontUser", password="frontPass")
 
 
 # Endpoints Section
@@ -94,7 +93,7 @@ def poll():
 # Security Section
 
 @app.route('/requestAccessTokenByUser', methods=['POST'])
-def get_access_token_by_secret():
+def get_access_token_by_user():
     """
     Endpoint to get an access token from the Backend.
     :return: A JSON object with a message and a status code.
@@ -215,8 +214,6 @@ def get_render_video():
 
 
 # Data Handler Section
-
-# Configure file uploads
 upload_files = os.path.join(os.getcwd(), 'uploads')
 app.config['UPLOADED_DEFAULT_DEST'] = upload_files  # Change this to your desired upload directory
 app.config['UPLOADED_DEFAULT_URL'] = 'http://localhost:5000/uploads/'  # Change this to your server's URL
