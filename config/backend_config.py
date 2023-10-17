@@ -68,13 +68,12 @@ class BasicMongoConfig(BaseModel):
             self.is_up = False
         return self.is_up
 
-    @staticmethod
-    def wait_for_mongo():
+    def wait_for_mongo(self):
         """
         Wait until the MongoDB service is up.
         """
-        while not BasicMongoConfig().mongo_is_up():
-            sleep(120)
+        while not self.mongo_is_up():
+            sleep(5)
 
     @staticmethod
     def save_obj(pickle_name: str, obj: object) -> bool:
