@@ -1,9 +1,12 @@
+import json
 import os
 import pickle
-import os
+from time import sleep
+from typing import Any
 
 from cryptography.fernet import Fernet
 from pydantic import BaseModel
+from pymongo import MongoClient
 
 from database.basic_mongo import UserDocument, LogDocument
 from log.basic_log_types import LogOrigins, log_type_info
@@ -12,9 +15,28 @@ from security.basic_encription import ObjectEncryptor
 
 
 class BasicMongoConfig(BaseModel):
-    db: str
-    username: str
-    password: str
+    credentials: str
+
+    db: str = ""
+    username: str = ""
+    password: str = ""
+    is_up: bool = False
+
+    def load_credentials(self):
+        """
+        Load the credentials from the credentials file.
+        """
+        credentials_json = self.load_config_from_json(os.path.join(self.credentials, "credentials.json"))
+        self.db = credentials_json.get("database", None)
+        self.username = credentials_json.get("username", None)
+        self.password = credentials_json.get("password", None)
+
+        if self.db is None or self.username is None or self.password is None:
+            print("Error loading credentials from file")
+            print("Using default credentials")
+            self.db = "visia_demo"
+            self.username = "rootuser"
+            self.password = "rootpass"
 
     def model_dump(self, **kwargs) -> dict:
         """
@@ -26,6 +48,98 @@ class BasicMongoConfig(BaseModel):
                 "password": self.password}
 
         return dump
+
+    def mongo_is_up(self) -> bool:
+        """
+        Check if the MongoDB service is up.
+        return: True if the MongoDB service is up, False otherwise.
+        """
+        try:
+            # Check if the MongoDB service is up
+            client = MongoClient('mongodb://localhost:27017/', serverSelectionTimeoutMS=2000)
+            # Ping the MongoDB server
+            self.is_up = client.admin.command('ping')
+            # Close the MongoClient
+            client.close()
+            print("MongoDB is UP!")
+        except Exception or ConnectionError as e:
+            print("MongoDB is DOWN!")
+            print(f"Error message: {e}")
+            self.is_up = False
+        return self.is_up
+
+    @staticmethod
+    def wait_for_mongo():
+        """
+        Wait until the MongoDB service is up.
+        """
+        while not BasicMongoConfig().mongo_is_up():
+            sleep(120)
+
+    @staticmethod
+    def save_obj(pickle_name: str, obj: object) -> bool:
+        """
+        Save an object in a pickle file
+        :param pickle_name: path of the pickle file
+        :param obj: object to save
+        """
+        try:
+            os.makedirs(os.path.dirname(pickle_name), exist_ok=True)
+            with open(pickle_name, 'wb') as handle:
+                pickle.dump(obj, handle, 0)
+            return True
+        except Exception or IOError as e:
+            print(f"Error saving object: {e}")
+            return False
+
+    @staticmethod
+    def load_obj(path_2_pkl: str) -> object:
+        """
+        Load an object from a pickle file
+        :param path_2_pkl: path of the pickle file
+        """
+        try:
+            if os.path.exists(path_2_pkl):
+                with open(path_2_pkl, 'rb') as pkl_file:
+                    return pickle.load(pkl_file)
+            else:
+                return None
+        except Exception or IOError as e:
+            print(f"Error loading object: {e}")
+            return None
+
+    @staticmethod
+    def load_config_from_json(path: str) -> Any | None:
+        """
+        Load a json file as a dictionary. Useful to load the configuration of the experiments
+        :param path: path to the json file
+        :return: dictionary with the configuration
+        """
+        try:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                return None
+        except Exception or IOError as e:
+            print(f"Error loading object: {e}")
+            return None
+
+    @staticmethod
+    def save_config_as_json(config: dict, path: str) -> bool:
+        """
+        Save a dictionary as a json file. Useful to save the configuration of the experiments
+        :param config: dictionary with the configuration
+        :param path: path to save the json file
+        """
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=4)
+                return True
+        except Exception or IOError as e:
+            print(f"Error saving object: {e}")
+            return False
 
 
 class BasicSecurityConfig:
