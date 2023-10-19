@@ -2,9 +2,10 @@ import os
 
 from flask import Flask, request, redirect
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 from flask_mongoengine import MongoEngine
-from pymongo import MongoClient
 from flask_uploads import UploadSet, configure_uploads, ARCHIVES
+from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
 from config.backend_config import BasicMongoConfig, BasicSecurityConfig
@@ -12,9 +13,8 @@ from database.basic_mongo import *
 from frontData.basic_record_types import BasicRecordSessionData
 from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
 from responses.basic_responses import DataResponse, BasicResponse, ListResponse, TokenResponse
+from utils.backup import BackUp
 from utils.utils import get_now_standard
-
-from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 
 # Initialize Flask
 app = Flask(__name__)
@@ -33,6 +33,9 @@ app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
 # Initialize MongoDB
 mongo = MongoEngine()
 mongo.init_app(app)
+
+# Create a backup
+backup = BackUp(mongo_config)
 
 
 # Endpoints Section
@@ -87,6 +90,25 @@ def poll():
     except (Exception or ConnectionError or TimeoutError):
         response = BasicResponse(success=False, message="Flask is UP! but MongoDB is DOWN!", status_code=503)
 
+    return response.model_dump_json()
+
+
+@app.route('/login/addUser', methods=['POST'])
+def add_user():
+    """
+    Endpoint to add a user to the MongoDB database.
+    """
+    try:
+        username = request.json.get('username', False)
+        password = request.json.get('password', False)
+        if username and password:
+            user = UserDocument(username=username, password=security_config.encryptor_backend.encrypt_object(password))
+            user.save()
+            response = BasicResponse(success=True, status_code=200, message="User added successfully")
+        else:
+            response = BasicResponse(success=False, status_code=400, message="Bad request")
+    except Exception as e:
+        response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()
 
 
@@ -321,6 +343,45 @@ def protected():
     :return: A BasicResponse with a message and a status code.
     """
     response = BasicResponse(success=True, status_code=200, message="Access granted")
+    return response.model_dump_json()
+
+
+# Backup Section
+@app.route('/backup/make', methods=['GET'])
+def make_backup():
+    """
+    Endpoint to make a backup of the database.
+    :return: A BasicResponse with a message and a status code.
+    """
+    try:
+        if backup.make():
+            response = BasicResponse(success=True, status_code=200, message="Backup created successfully")
+        else:
+            response = BasicResponse(success=False, status_code=400, message="Backup not created")
+    except Exception as e:
+        response = BasicResponse(success=False, status_code=500, message=str(e))
+    return response.model_dump_json()
+
+
+@app.route('/backup/restore', methods=['GET'])
+def restore_backup():
+    """
+    Endpoint to make a backup of the database.
+    :return: A BasicResponse with a message and a status code.
+    """
+    try:
+        backup_date = request.args.get('date', '')
+        if backup.restore(backup_date):
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                        message=f"Backup restored successfully: {backup_date}").save()
+            response = BasicResponse(success=True, status_code=200, message="Backup restored successfully")
+        else:
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
+                        message=f"Backup not restored: {backup_date}").save()
+            response = BasicResponse(success=False, status_code=400, message="Backup not restored")
+    except Exception as e:
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()
 
 
