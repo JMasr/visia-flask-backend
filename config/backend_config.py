@@ -20,7 +20,10 @@ class BasicMongoConfig(BaseModel):
     db: str = ""
     username: str = ""
     password: str = ""
+    host: str = "localhost"
+    port: int = 27017
     is_up: bool = False
+    backup_path: str = f"D:\\Visia\\backup_mongo"
 
     def load_credentials(self):
         """
