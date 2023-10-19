@@ -2,10 +2,6 @@ import os
 import pickle
 from datetime import datetime
 
-from pydantic import BaseModel
-
-from database.basic_mongo import VideoDocument, LogDocument, UserDocument
-
 
 def get_now_standard() -> str:
     """

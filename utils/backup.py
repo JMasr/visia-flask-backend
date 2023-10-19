@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from utils.utils import get_now_standard
 
 
-class BackUp():
+class BackUp:
     """
     Class to perform backups of the MongoDB database.
     """
