@@ -1,7 +1,7 @@
 import os
 
 from flask import Flask, request, redirect, send_from_directory
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 from flask_mongoengine import MongoEngine
 from flask_uploads import UploadSet, configure_uploads, ARCHIVES
@@ -20,7 +20,7 @@ from utils.utils import get_now_standard
 # Initialize Flask
 app = Flask(__name__)
 # Enable CORS for all routes
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "http://visia_web:8080"}})
 
 # Set the secret key to enable JWT authentication
 security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets'))
@@ -61,6 +61,7 @@ def resource_not_found(e):
 
 
 @app.route('/')
+@cross_origin()
 def index():
     """
     A simple endpoint with a welcome message from the Backend.
@@ -76,6 +77,7 @@ def favicon():
 
 
 @app.route('/poll')
+@cross_origin()
 def poll():
     """
     A simple endpoint to test the connection with the Backend
@@ -83,7 +85,7 @@ def poll():
     """
     try:
         # Initialize a MongoClient
-        client = MongoClient('mongodb://localhost:27017/', serverSelectionTimeoutMS=2000)
+        client = MongoClient(f'mongodb://{mongo_config.host}:{mongo_config.port}/', serverSelectionTimeoutMS=2000)
         # Ping the MongoDB server
         is_up = client.admin.command('ping')
         # Close the MongoClient
@@ -122,6 +124,7 @@ def add_user():
 # Security Section
 
 @app.route('/requestAccessTokenByUser', methods=['POST'])
+@cross_origin()
 def get_access_token_by_user():
     """
     Endpoint to get an access token from the Backend.
@@ -156,6 +159,7 @@ def get_access_token_by_user():
 
 # Log Section
 @app.route('/log/addLogFrontEnd', methods=['POST'])
+@cross_origin()
 def upload_log_frontend() -> str:
     """
     Endpoint to log data from the FrontEnd
@@ -185,6 +189,7 @@ def upload_log_backend() -> str:
 
 # Endpoint to retrieve logs by type
 @app.route('/log/getLogsBy', methods=['GET'])
+@cross_origin()
 def get_logs_by() -> str:
     """
     Endpoint to retrieve logs from the MongoDB database based on specified filters.
@@ -212,6 +217,7 @@ record_data = BasicRecordSessionData(patient_id="001-T-PAT", crd_id="001-T-CRD")
 
 # Render functions for the frontend
 @app.route('/render/getRecordData')
+@cross_origin()
 def get_record_session_data():
     try:
         response = DataResponse(success=True, status_code=200, message="Data for Record-Session is ready",
@@ -225,6 +231,7 @@ def get_record_session_data():
 
 
 @app.route('/video', methods=['GET'])
+@cross_origin()
 def get_render_video():
     """
     Endpoint to render a video file from a get request.
@@ -254,6 +261,7 @@ configure_uploads(app, (uploads,))
 
 @app.route('/video/uploads', methods=['POST'])
 @jwt_required()
+@cross_origin()
 def upload_video() -> str:
     """
     Endpoint to upload a video file to the server.
@@ -355,13 +363,14 @@ def protected():
 
 # Backup Section
 @app.route('/backup/make', methods=['GET'])
+@cross_origin()
 def make_backup():
     """
     Endpoint to make a backup of the database.
     :return: A BasicResponse with a message and a status code.
     """
     try:
-        if backup.make():
+        if backup.make_():
             response = BasicResponse(success=True, status_code=200, message="Backup created successfully")
         else:
             response = BasicResponse(success=False, status_code=400, message="Backup not created")
@@ -371,6 +380,7 @@ def make_backup():
 
 
 @app.route('/backup/restore', methods=['GET'])
+@cross_origin()
 def restore_backup():
     """
     Endpoint to make a backup of the database.
