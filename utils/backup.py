@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 
 from pydantic import BaseModel
@@ -36,6 +37,41 @@ class BackUp:
             subprocess.run(cmd)
 
             # Save the backup file
+            return True
+        except Exception as e:
+            print(f"Error making backup: {e}")
+            return False
+
+    def make_(self) -> bool:
+        try:
+            os.makedirs(os.path.dirname(self.mongo_config.backup_path), exist_ok=True)
+
+            if platform.system() == "Windows":
+                # Define the command to run mongodump for Windows
+                cmd = [
+                    os.path.join(os.getcwd(), 'utils', 'mongodump.exe'),
+                    '--db', self.mongo_config.db,
+                    '--out', os.path.join(self.mongo_config.backup_path, get_now_standard()),
+                    '--username', self.mongo_config.username,
+                    '--password', self.mongo_config.password,
+                    '--authenticationDatabase', 'admin',
+                    '--host', self.mongo_config.host,
+                    '--port', str(self.mongo_config.port)
+                ]
+            else:  # Assume it's Linux
+                # Define the command to run mongodump for Linux
+                cmd = [
+                    os.path.join(os.getcwd(), 'utils', 'mongodump'),
+                    '--db', self.mongo_config.db,
+                    '--out', os.path.join(self.mongo_config.backup_path, get_now_standard()),
+                    '--username', self.mongo_config.username,
+                    '--password', self.mongo_config.password,
+                    '--authenticationDatabase', 'admin',
+                    '--host', self.mongo_config.host,
+                    '--port', str(self.mongo_config.port)
+                ]
+
+            subprocess.run(cmd)
             return True
         except Exception as e:
             print(f"Error making backup: {e}")
