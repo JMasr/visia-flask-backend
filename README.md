@@ -4,24 +4,19 @@ Repository of the Visia's Backend using Flask+MongoDB
 ### Requirements
 
 * A MongoDB instance running on the default port (27017) 
-* Python 3.7 or higher
+* Python 3.10 or higher
 
 
 ### Installation
 1. Clone the repository
-2. Create a virtual environment importing the **environment.yml** file:
-    ```bash
-    conda env create -f environment.yml
-    ```
-3. Activate the environment:
-    ```bash
-    conda activate visia-flask-backend
-    ```
-4. Install the requirements:
+
+2. Install the requirements:
     ```bash
     pip install -r requirements.txt
     ```
-5. Run the application:
+3. Copy the extras to your environment
+
+4. Run the application:
     ``` bash
     SET FLASK_APP=app.py
     SET FLASK_ENV=development
