@@ -1,6 +1,9 @@
-flask~=2.3.3
-pydantic~=2.4.2
-pymongo~=4.5.0
-mongoengine~=0.26.0
-werkzeug~=2.3.7
-cryptography~=41.0.4
+cryptography==41.0.4
+Flask==3.0.0
+Flask_Cors==4.0.0
+Flask_JWT_Extended==4.5.3
+flask_mongoengine==1.0.0
+Flask_Uploads==0.2.1
+mongoengine==0.26.0
+pydantic==2.4.2
+pymongo==4.5.0
