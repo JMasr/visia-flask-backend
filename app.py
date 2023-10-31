@@ -1,10 +1,11 @@
 import os
 
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 from flask_mongoengine import MongoEngine
 from flask_uploads import UploadSet, configure_uploads, ARCHIVES
+
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
@@ -66,6 +67,12 @@ def index():
     :return: A welcome message from the Backend.
     """
     return 'Welcome to the backend!'
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico',
+                               mimetype='image/vnd.microsoft.icon')
 
 
 @app.route('/poll')
@@ -257,7 +264,7 @@ def upload_video() -> str:
         video = request.files.get('video')
 
         # Save the video file to a specified path
-        # save = os.path.join(upload_files, f"video.filename.webm")
+        # save = os.path.join(upload_files, f"video.filename.mkv")
 
         video_buffer = video.stream.read()
         video_encrypted = security_config.encryptor_backend.encrypt_object(video_buffer)
@@ -265,7 +272,7 @@ def upload_video() -> str:
         # Get the data from the request body
         crd_id = request.form.get('crd_id', "UNK")
         patient_id = request.form.get('patient_id', "UNK")
-        file_name = request.form.get('file_name', f"{crd_id}--{patient_id}--{get_now_standard()}.webm")
+        file_name = request.form.get('file_name', f"{crd_id}--{patient_id}--{get_now_standard()}.mkv")
 
         # Create a VideoAction
         video_act = VideoActionsMongoDB(crd_id=crd_id, patient_id=patient_id, filename=file_name)
@@ -386,4 +393,4 @@ def restore_backup():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='127.0.0.1', port=8181)
