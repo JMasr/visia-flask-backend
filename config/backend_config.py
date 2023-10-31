@@ -21,10 +21,10 @@ class BasicMongoConfig(BaseModel):
     db: str = ""
     username: str = ""
     password: str = ""
-    host: str = "localhost"
+    host: str = "mongodb"
     port: int = 27017
     is_up: bool = False
-    backup_path: str = f"D:\\Visia\\backup_mongo"
+    backup_path: str = os.path.join(os.getcwd(), "backups")
 
     def load_credentials(self):
         """
@@ -34,6 +34,8 @@ class BasicMongoConfig(BaseModel):
         self.db = credentials_json.get("database", None)
         self.username = credentials_json.get("username", None)
         self.password = credentials_json.get("password", None)
+        self.host = credentials_json.get("host", None)
+        self.port = credentials_json.get("port", 27017)
 
         if self.db is None or self.username is None or self.password is None:
             print("Error loading credentials from file")
@@ -41,6 +43,8 @@ class BasicMongoConfig(BaseModel):
             self.db = "visia_demo"
             self.username = "rootuser"
             self.password = "rootpass"
+            self.host = "localhost"
+            self.port = 27017
 
     def model_dump(self, **kwargs) -> dict:
         """
@@ -49,7 +53,9 @@ class BasicMongoConfig(BaseModel):
         """
         dump = {"db": self.db,
                 "username": self.username,
-                "password": self.password}
+                "password": self.password,
+                "host": self.host,
+                "port": self.port,}
 
         return dump
 
@@ -60,7 +66,7 @@ class BasicMongoConfig(BaseModel):
         """
         try:
             # Check if the MongoDB service is up
-            client = MongoClient('mongodb://localhost:27017/', serverSelectionTimeoutMS=2000)
+            client = MongoClient(f'mongodb://{self.host}:{self.port}/', serverSelectionTimeoutMS=2000)
             # Ping the MongoDB server
             self.is_up = client.admin.command('ping')
             # Close the MongoClient
