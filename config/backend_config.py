@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import pickle
+from logging.handlers import RotatingFileHandler
 from time import sleep
 from typing import Any
 
@@ -33,23 +35,28 @@ class BasicMongoConfig(BaseModel):
     password: str = ""
     host: str = "mongodb"
     port: int = 27017
+    type: str = "MongoDB"
     is_up: bool = False
     backup_path: str = os.path.join(os.getcwd(), "backups")
 
-    credentials: str
+    path_to_config: str
 
     def load_credentials(self):
         """
         Load the credentials from the credentials file.
         """
-        credentials_json = self.load_config_from_json(os.path.join(self.credentials, "mongo_config.json"))
-        self.db = credentials_json.get("database", None)
-        self.username = credentials_json.get("username", None)
-        self.password = credentials_json.get("password", None)
-        self.host = credentials_json.get("host", None)
-        self.port = credentials_json.get("port", 27017)
+        self.path_to_config = os.path.join(self.path_to_config, "mongo_config.json")
+        if os.path.exists(self.path_to_config):
+            # Read the credentials from the credentials file
+            credentials_json = self.load_config_from_json(self.path_to_config)
 
-        if self.db is None or self.username is None or self.password is None:
+            # Create a loop over the class´s attributes
+            for attr in self.__dict__:
+                # Check if the attribute is in the credentials file
+                if attr in credentials_json:
+                    # Set the attribute value
+                    self.__setattr__(attr, credentials_json[attr])
+        else:
             print("Error loading credentials from file")
             print("Using default credentials")
             self.db = "visia_demo"
@@ -57,6 +64,9 @@ class BasicMongoConfig(BaseModel):
             self.password = "rootpass"
             self.host = "localhost"
             self.port = 27017
+            self.type = "MongoDB"
+            self.backup_path = os.path.join(os.getcwd(), "backups")
+        self.is_up = self.server_is_up()
 
     def model_dump(self, **kwargs) -> dict:
         """
@@ -71,7 +81,7 @@ class BasicMongoConfig(BaseModel):
 
         return dump
 
-    def mongo_is_up(self) -> bool:
+    def server_is_up(self) -> bool:
         """
         Check if the MongoDB service is up.
         return: True if the MongoDB service is up, False otherwise.
@@ -83,10 +93,7 @@ class BasicMongoConfig(BaseModel):
             self.is_up = client.admin.command('ping')
             # Close the MongoClient
             client.close()
-            print("MongoDB is UP!")
         except Exception or ConnectionError as e:
-            print("MongoDB is DOWN!")
-            print(f"Error message: {e}")
             self.is_up = False
         return self.is_up
 
@@ -95,7 +102,7 @@ class BasicMongoConfig(BaseModel):
         Wait until the MongoDB service is up.
         :param timeout: Timeout in seconds.
         """
-        while not self.mongo_is_up():
+        while not self.server_is_up():
             sleep(timeout)
 
     @staticmethod
@@ -220,7 +227,7 @@ class BasicSecurityConfig:
         return response
 
 
-class BasicFrontConfig(BaseModel):
+class BasicServerConfig(BaseModel):
     """
     Class to handle the configuration of the Frontend.
     @:param host: Host of the frontend
@@ -229,6 +236,7 @@ class BasicFrontConfig(BaseModel):
     """
     host: str = "http://localhost"
     port: int = 8080
+    type: str = "Frontend"
     is_up: bool = False
 
     path_to_config: str
@@ -237,15 +245,16 @@ class BasicFrontConfig(BaseModel):
         """
         Load the credentials from the credentials file.
         """
-        # Read the credentials from the credentials file
-        credentials_json = self.load_config_from_json(os.path.join(self.path_to_config, "frontend_config.json"))
-
-        # Create a loop over the class´s attributes
-        for attr in self.__dict__:
-            # Check if the attribute is in the credentials file
-            if attr in credentials_json:
-                # Set the attribute value
-                self.__setattr__(attr, credentials_json[attr])
+        if not os.path.exists(self.path_to_config):
+            print("Error loading credentials from file")
+            print("Using default credentials")
+        else:
+            credentials_json = self.load_config_from_json(self.path_to_config)
+            # Create a loop over the class´s attributes
+            for attr in self.__dict__:
+                if attr in credentials_json:
+                    self.__setattr__(attr, credentials_json[attr])
+        self.is_up = self.server_is_up()
 
     def model_dump(self, **kwargs) -> dict:
         """
@@ -266,14 +275,9 @@ class BasicFrontConfig(BaseModel):
         try:
             if requests.head(f"http://{self.host}:{self.port}").status_code == 200:
                 self.is_up = True
-                print("Server is UP!")
             else:
                 self.is_up = False
-                print("Server is DOWN!")
-
         except Exception or ConnectionError as e:
-            print("Server is DOWN!")
-            print(f"Error message: {e}")
             self.is_up = False
         return self.is_up
 
@@ -327,3 +331,20 @@ class BasicFrontConfig(BaseModel):
         except Exception or IOError as e:
             print(f"Error saving object: {e}")
             return False
+
+
+class BasicLoggerConfig:
+    def __init__(self, log_file: str, log_name: str = "Visia-BackEnd_Logger", max_log_size: int = (5 * 1024 * 1024),
+                 backup_count: int = 3):
+        self.logger = logging.getLogger(log_name)
+        self.logger.setLevel(logging.INFO)
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        handler = RotatingFileHandler(log_file, maxBytes=max_log_size, backupCount=backup_count)
+        handler.setFormatter(formatter)
+
+        self.logger.addHandler(handler)
+
+    def get_logger(self):
+        return self.logger

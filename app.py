@@ -8,7 +8,7 @@ from flask_uploads import UploadSet, configure_uploads, ARCHIVES
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
-from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicFrontConfig
+from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicServerConfig, BasicLoggerConfig
 from database.basic_mongo import *
 from frontData.basic_record_types import BasicRecordSessionData
 from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
@@ -19,12 +19,16 @@ from utils.utils import get_now_standard
 # Initialize Flask
 app = Flask(__name__)
 
+# Configure BackEnd
+flask_app = BasicServerConfig(path_to_config=os.path.join(os.getcwd(), 'secrets', 'backend_config.json'))
+flask_app.load_config()
+
 # Configure FrontEnd
-react_app = BasicFrontConfig(path_to_config=os.path.join(os.getcwd(), 'secrets'))
+react_app = BasicServerConfig(path_to_config=os.path.join(os.getcwd(), 'secrets', 'frontend_config.json'))
 react_app.load_config()
 
 # Configure MongoDB
-mongo_config = BasicMongoConfig(credentials=os.path.join(os.getcwd(), 'secrets'))
+mongo_config = BasicMongoConfig(path_to_config=os.path.join(os.getcwd(), 'secrets'))
 mongo_config.load_credentials()
 app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
 # Initialize MongoDB
@@ -39,23 +43,20 @@ jwt = JWTManager(app)
 # Create a backup
 backup = BackUp(mongo_config)
 
+# Create a logger
+logger_config = BasicLoggerConfig(log_file=os.path.join(os.getcwd(), 'logs', 'backend.log'))
+logger = logger_config.get_logger()
+
 # Enable CORS for all routes
 CORS(app, resources={r"/*": {"origins": f"https://{react_app.host}:{react_app.port}"}})
 
-# Check servers
-if mongo_config.mongo_is_up():
-    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                message=f"MongoDB is UP!").save()
-else:
-    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
-                message=f"MongoDB is DOWN!").save()
-
-if react_app.server_is_up():
-    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                message=f"FrontEnd is UP!").save()
-else:
-    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
-                message=f"FrontEnd is DOWN!").save()
+# Check the server status
+logger.info("*** Starting the backend ***")
+logger.info("--- Checking the server status ---")
+logger.info(f"MongoDB: {mongo_config.host}:{mongo_config.port}"
+            f" - Status: {'UP' if mongo_config.server_is_up() else 'DOWN'}")
+logger.info(f"Flask: {react_app.host}:{react_app.port}"
+            f" - Status: {'UP' if react_app.server_is_up() else 'DOWN'}")
 
 
 # Endpoints Section
@@ -265,7 +266,7 @@ def get_render_video():
                     message=f"Video requested: {record_data.crd_id}--{record_data.patient_id}").save()
     except Exception as e:
         LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
-    return redirect(f"http://localhost:5173/")
+    return redirect(f"http://{react_app.host}:{react_app.port}/")
 
 
 # Data Handler Section
@@ -276,6 +277,28 @@ app.config['UPLOADED_DEFAULT_ALLOW'] = set(ARCHIVES)
 app.config['UPLOADED_DEFAULT_DENY'] = set()
 uploads = UploadSet('default', extensions=('',))
 configure_uploads(app, (uploads,))
+
+
+@app.route('/video/digicam/makeVideo', methods=['GET'])
+# @jwt_required()
+@cross_origin()
+def record_video() -> str:
+    """
+    Endpoint to record a video file using DigicamControl.
+    """
+    # TODO: Implement this endpoint
+    return BasicResponse(success=True, status_code=200, message="Video recorded successfully").model_dump_json()
+
+
+@app.route('/video/digicam/takePicture', methods=['GET'])
+# @jwt_required()
+@cross_origin()
+def take_picture() -> str:
+    """
+    Endpoint to take a picture using DigicamControl.
+    """
+    # TODO: Implement this endpoint
+    return BasicResponse(success=True, status_code=200, message="Take a picture").model_dump_json()
 
 
 @app.route('/video/uploads', methods=['POST'])
@@ -422,4 +445,4 @@ def restore_backup():
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8181)
+    app.run()
