@@ -5,11 +5,10 @@ from flask_cors import CORS, cross_origin
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 from flask_mongoengine import MongoEngine
 from flask_uploads import UploadSet, configure_uploads, ARCHIVES
-
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
-from config.backend_config import BasicMongoConfig, BasicSecurityConfig
+from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicFrontConfig
 from database.basic_mongo import *
 from frontData.basic_record_types import BasicRecordSessionData
 from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
@@ -19,13 +18,10 @@ from utils.utils import get_now_standard
 
 # Initialize Flask
 app = Flask(__name__)
-# Enable CORS for all routes
-CORS(app, resources={r"/*": {"origins": "http://visia_web:8080"}})
 
-# Set the secret key to enable JWT authentication
-security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets'))
-app.config['JWT_SECRET_KEY'] = security_config.secret
-jwt = JWTManager(app)
+# Configure FrontEnd
+react_app = BasicFrontConfig(path_to_config=os.path.join(os.getcwd(), 'secrets'))
+react_app.load_config()
 
 # Configure MongoDB
 mongo_config = BasicMongoConfig(credentials=os.path.join(os.getcwd(), 'secrets'))
@@ -35,8 +31,31 @@ app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
 mongo = MongoEngine()
 mongo.init_app(app)
 
+# Set the secret key to enable JWT authentication
+security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets'))
+app.config['JWT_SECRET_KEY'] = security_config.secret
+jwt = JWTManager(app)
+
 # Create a backup
 backup = BackUp(mongo_config)
+
+# Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": f"https://{react_app.host}:{react_app.port}"}})
+
+# Check servers
+if mongo_config.mongo_is_up():
+    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                message=f"MongoDB is UP!").save()
+else:
+    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
+                message=f"MongoDB is DOWN!").save()
+
+if react_app.server_is_up():
+    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                message=f"FrontEnd is UP!").save()
+else:
+    LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
+                message=f"FrontEnd is DOWN!").save()
 
 
 # Endpoints Section
