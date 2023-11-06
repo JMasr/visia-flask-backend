@@ -55,7 +55,7 @@ class BasicMongoConfig(BaseModel):
                 "username": self.username,
                 "password": self.password,
                 "host": self.host,
-                "port": self.port,}
+                "port": self.port}
 
         return dump
 
