@@ -18,6 +18,113 @@ from security.basic_encription import ObjectEncryptor
 from utils import utils
 
 
+class BasicServerConfig(BaseModel):
+    """
+    Class to handle the configuration of the Frontend.
+    @:param host: Host of the frontend
+    @:param port: Port of the frontend
+    @:param is_up: True if the frontend service is up, False otherwise
+    """
+    host: str = "http://localhost"
+    port: int = 8080
+    type: str = "Frontend"
+    is_up: bool = False
+
+    path_to_config: str
+
+    def load_config(self):
+        """
+        Load the credentials from the credentials file.
+        """
+        if not os.path.exists(self.path_to_config):
+            print("Error loading credentials from file")
+            print("Using default credentials")
+        else:
+            credentials_json = self.load_config_from_json(self.path_to_config)
+            # Create a loop over the class´s attributes
+            for attr in self.__dict__:
+                if attr in credentials_json:
+                    self.__setattr__(attr, credentials_json[attr])
+        self.is_up = self.server_is_up()
+
+    def model_dump(self, **kwargs) -> dict:
+        """
+        Dump the model data as a dictionary.
+        :return: A dict with the model data.
+        """
+        dump: dict = {}
+        for attr in self.__dict__:
+            dump[attr] = self.__getattribute__(attr)
+
+        return dump
+
+    def server_is_up(self) -> bool:
+        """
+        Check if the server is up.
+        return: True if the server is up, False otherwise.
+        """
+        try:
+            if requests.head(f"{self.host}:{self.port}").status_code == 200:
+                self.is_up = True
+            else:
+                self.is_up = False
+        except Exception or ConnectionError as e:
+            print(f"Error connecting to the server: {e}")
+            self.is_up = False
+        return self.is_up
+
+    @staticmethod
+    def save_obj(pickle_name: str, obj: object) -> bool:
+        """
+        Save an object in a pickle file
+        :param pickle_name: path of the pickle file
+        :param obj: object to save
+        """
+        return utils.save_obj(pickle_name, obj)
+
+    @staticmethod
+    def load_obj(path_2_pkl: str) -> object:
+        """
+        Load an object from a pickle file
+        :param path_2_pkl: path of the pickle file
+        """
+        return utils.load_obj(path_2_pkl)
+
+    @staticmethod
+    def load_config_from_json(path: str) -> Any | None:
+        """
+        Load a json file as a dictionary. Useful to load the configuration of the experiments
+        :param path: path to the json file
+        :return: dictionary with the configuration
+        """
+        try:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                return None
+        except Exception or IOError as e:
+            print(f"Error loading object: {e}")
+            return None
+
+
+def save_config_as_json(config: dict, path: str) -> bool:
+    """
+    Save a dictionary as a json file. Useful to save the configuration of the experiments
+    :param config: dictionary with the configuration
+    :param path: path to save the json file
+    :return: True if the file was saved successfully, False otherwise
+    """
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=4)
+            return True
+    except Exception or IOError as e:
+        print(f"Error saving object: {e}")
+        return False
+
+
 class BasicMongoConfig(BaseModel):
     """
     Class to handle the configuration of the MongoDB database.
@@ -33,7 +140,7 @@ class BasicMongoConfig(BaseModel):
     db: str = ""
     username: str = ""
     password: str = ""
-    host: str = "mongodb"
+    host: str = "http://localhost"
     port: int = 27017
     type: str = "MongoDB"
     is_up: bool = False
@@ -94,6 +201,7 @@ class BasicMongoConfig(BaseModel):
             # Close the MongoClient
             client.close()
         except Exception or ConnectionError as e:
+            print(f"Error connecting to the MongoDB server: {e}")
             self.is_up = False
         return self.is_up
 
@@ -138,23 +246,6 @@ class BasicMongoConfig(BaseModel):
         except Exception or IOError as e:
             print(f"Error loading object: {e}")
             return None
-
-    @staticmethod
-    def save_config_as_json(config: dict, path: str) -> bool:
-        """
-        Save a dictionary as a json file. Useful to save the configuration of the experiments
-        :param config: dictionary with the configuration
-        :param path: path to save the json file
-        :return: True if the file was saved successfully, False otherwise
-        """
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
-                return True
-        except Exception or IOError as e:
-            print(f"Error saving object: {e}")
-            return False
 
 
 class BasicSecurityConfig:
@@ -227,76 +318,67 @@ class BasicSecurityConfig:
         return response
 
 
-class BasicServerConfig(BaseModel):
-    """
-    Class to handle the configuration of the Frontend.
-    @:param host: Host of the frontend
-    @:param port: Port of the frontend
-    @:param is_up: True if the frontend service is up, False otherwise
-    """
-    host: str = "http://localhost"
-    port: int = 8080
-    type: str = "Frontend"
-    is_up: bool = False
+class BasicLoggerConfig:
+    def __init__(self, log_file: str, log_name: str = "Visia-BackEnd_Logger", max_log_size: int = (5 * 1024 * 1024),
+                 backup_count: int = 3):
+        self.logger = logging.getLogger(log_name)
+        self.logger.setLevel(logging.INFO)
 
+        # Create a formatter to add the time, name, level and message of the log
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        # Create a file handler to store logs in a file
+        file_handler = RotatingFileHandler(log_file, maxBytes=max_log_size, backupCount=backup_count)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+
+        # Create a stream handler to print logs in the console
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+
+    def get_logger(self):
+        return self.logger
+
+
+class BasicCameraConfig(BaseModel):
     path_to_config: str
+    controller_path: str = r"C:\Program Files (x86)\digiCamControl"
+
+    iso: int = 100
+    aperture: float = 2.8
+    exposure_comp: str = "0"
+    shutter_speed: str = "1/100"
+
+    auto_focus: bool = True
+    compression: str = "RAW"
+    white_balance: str = "Auto"
+
+    counter: int = 0
+    transfer_mode: str = "Save_to_PC_only"
+    image_name: str = "visia_crd"
+    storage_path: str = os.path.join(os.getcwd(), "uploads")
+
+    type: str = "Camera"
 
     def load_config(self):
         """
-        Load the credentials from the credentials file.
+        Load the configuration from the JSON file.
         """
         if not os.path.exists(self.path_to_config):
-            print("Error loading credentials from file")
-            print("Using default credentials")
+            logger.error(f"Camera: Error loading credentials from file - Location: {self.path_to_config}")
+            logger.error("Camera: Using default credentials")
         else:
-            credentials_json = self.load_config_from_json(self.path_to_config)
-            # Create a loop over the class´s attributes
-            for attr in self.__dict__:
-                if attr in credentials_json:
-                    self.__setattr__(attr, credentials_json[attr])
-        self.is_up = self.server_is_up()
-
-    def model_dump(self, **kwargs) -> dict:
-        """
-        Dump the model data as a dictionary.
-        :return: A dict with the model data.
-        """
-        dump: dict = {}
-        for attr in self.__dict__:
-            dump[attr] = self.__getattribute__(attr)
-
-        return dump
-
-    def server_is_up(self) -> bool:
-        """
-        Check if the server is up.
-        return: True if the server is up, False otherwise.
-        """
-        try:
-            if requests.head(f"http://{self.host}:{self.port}").status_code == 200:
-                self.is_up = True
-            else:
-                self.is_up = False
-        except Exception or ConnectionError as e:
-            self.is_up = False
-        return self.is_up
-
-    @staticmethod
-    def save_obj(pickle_name: str, obj: object) -> bool:
-        """
-        Save an object in a pickle file
-        :param pickle_name: path of the pickle file
-        :param obj: object to save
-        """
-        return utils.save_obj(pickle_name, obj)
-
-    @staticmethod
-    def load_obj(path_2_pkl: str) -> object:
-        """
-        Load an object from a pickle file
-        :param path_2_pkl: path of the pickle file
-        """
-        return utils.load_obj(path_2_pkl)
+            try:
+                credentials_json = self.load_config_from_json(self.path_to_config)
+                # Create a loop over the class´s attributes
+                for attr in self.__dict__:
+                    if attr in credentials_json:
+                        self.__setattr__(attr, credentials_json[attr])
+                logger.info("Camera: Configuration loaded successfully")
+                logger.info(f"Camera: Configuration read - {self.model_dump()}")
+            except Exception as e:
+                logger.error(f"Camera: Error loading configuration - {e}")
 
     @staticmethod
     def load_config_from_json(path: str) -> Any | None:
@@ -315,36 +397,7 @@ class BasicServerConfig(BaseModel):
             print(f"Error loading object: {e}")
             return None
 
-    @staticmethod
-    def save_config_as_json(config: dict, path: str) -> bool:
-        """
-        Save a dictionary as a json file. Useful to save the configuration of the experiments
-        :param config: dictionary with the configuration
-        :param path: path to save the json file
-        :return: True if the file was saved successfully, False otherwise
-        """
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
-                return True
-        except Exception or IOError as e:
-            print(f"Error saving object: {e}")
-            return False
 
-
-class BasicLoggerConfig:
-    def __init__(self, log_file: str, log_name: str = "Visia-BackEnd_Logger", max_log_size: int = (5 * 1024 * 1024),
-                 backup_count: int = 3):
-        self.logger = logging.getLogger(log_name)
-        self.logger.setLevel(logging.INFO)
-
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-        handler = RotatingFileHandler(log_file, maxBytes=max_log_size, backupCount=backup_count)
-        handler.setFormatter(formatter)
-
-        self.logger.addHandler(handler)
-
-    def get_logger(self):
-        return self.logger
+# Create a logger
+logger_config = BasicLoggerConfig(log_file=os.path.join(os.getcwd(), 'logs', 'backend.log'))
+logger = logger_config.get_logger()
