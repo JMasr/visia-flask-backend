@@ -8,7 +8,8 @@ from flask_uploads import UploadSet, configure_uploads, ARCHIVES
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
-from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicServerConfig, BasicLoggerConfig
+from camera.cam import Camera
+from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicServerConfig, BasicCameraConfig, logger
 from database.basic_mongo import *
 from frontData.basic_record_types import BasicRecordSessionData
 from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
@@ -21,7 +22,6 @@ app = Flask(__name__)
 
 # Configure BackEnd
 flask_app = BasicServerConfig(path_to_config=os.path.join(os.getcwd(), 'secrets', 'backend_config.json'))
-flask_app.load_config()
 
 # Configure FrontEnd
 react_app = BasicServerConfig(path_to_config=os.path.join(os.getcwd(), 'secrets', 'frontend_config.json'))
@@ -43,20 +43,20 @@ jwt = JWTManager(app)
 # Create a backup
 backup = BackUp(mongo_config)
 
-# Create a logger
-logger_config = BasicLoggerConfig(log_file=os.path.join(os.getcwd(), 'logs', 'backend.log'))
-logger = logger_config.get_logger()
-
 # Enable CORS for all routes
-CORS(app, resources={r"/*": {"origins": f"https://{react_app.host}:{react_app.port}"}})
+CORS(app, resources={r"/*": {"origins": f"{react_app.host}:{react_app.port}"}})
 
 # Check the server status
 logger.info("*** Starting the backend ***")
 logger.info("--- Checking the server status ---")
-logger.info(f"MongoDB: {mongo_config.host}:{mongo_config.port}"
-            f" - Status: {'UP' if mongo_config.server_is_up() else 'DOWN'}")
-logger.info(f"Flask: {react_app.host}:{react_app.port}"
-            f" - Status: {'UP' if react_app.server_is_up() else 'DOWN'}")
+logger.info(f'MongoDB: http://{mongo_config.host}:{mongo_config.port}'
+            f' - Status: {"UP" if mongo_config.server_is_up() else "DOWN"}')
+logger.info(f'UI: {react_app.host}:{react_app.port} - Status: {"UP" if react_app.server_is_up() else "DOWN"}')
+
+# Configure the camera if a config file is present
+camera_config = BasicCameraConfig(path_to_config="")
+camera_config.load_config()
+camera = Camera(config=camera_config)
 
 
 # Endpoints Section
@@ -87,6 +87,7 @@ def index():
     A simple endpoint with a welcome message from the Backend.
     :return: A welcome message from the Backend.
     """
+    flask_app.load_config()
     return 'Welcome to the backend!'
 
 
@@ -266,7 +267,7 @@ def get_render_video():
                     message=f"Video requested: {record_data.crd_id}--{record_data.patient_id}").save()
     except Exception as e:
         LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
-    return redirect(f"http://{react_app.host}:{react_app.port}/")
+    return redirect(f"https://{react_app.host}:{react_app.port}/")
 
 
 # Data Handler Section
@@ -298,7 +299,13 @@ def take_picture() -> str:
     Endpoint to take a picture using DigicamControl.
     """
     # TODO: Implement this endpoint
-    return BasicResponse(success=True, status_code=200, message="Take a picture").model_dump_json()
+    try:
+        camera.capture()
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Picture taken").save()
+        return BasicResponse(success=True, status_code=200, message="Take a picture").model_dump_json()
+    except Exception as e:
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
 
 
 @app.route('/video/uploads', methods=['POST'])
