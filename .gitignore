@@ -5,9 +5,14 @@
 secrets/*
 *.pickle
 *.pkl
+# Multimedia
 *.webm
 *.mp4
 *.mkv
+*.jpg
+*.jpeg
+*.png
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
