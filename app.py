@@ -1,6 +1,7 @@
+import io
 import os
 
-from flask import Flask, request, redirect, send_from_directory
+from flask import Flask, request, redirect, send_from_directory, send_file, Response
 from flask_cors import CORS, cross_origin
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 from flask_mongoengine import MongoEngine
@@ -288,21 +289,29 @@ def record_video() -> str:
     Endpoint to record a video file using DigicamControl.
     """
     # TODO: Implement this endpoint
-    return BasicResponse(success=True, status_code=200, message="Video recorded successfully").model_dump_json()
+    try:
+        camera_response = camera.start_recording()
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Video recorded").save()
+        return BasicResponse(success=True, status_code=200, message="Video recorded successfully").model_dump_json()
+    except Exception as e:
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
 
 
 @app.route('/video/digicam/takePicture', methods=['GET'])
 # @jwt_required()
 @cross_origin()
-def take_picture() -> str:
+def take_picture() -> Response | str:
     """
     Endpoint to take a picture using DigicamControl.
     """
-    # TODO: Implement this endpoint
     try:
-        camera.capture()
+        camera_respond = camera.capture()
         LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Picture taken").save()
-        return BasicResponse(success=True, status_code=200, message="Take a picture").model_dump_json()
+        return send_file(io.BytesIO(camera_respond.data.get("image")),
+                         download_name=camera_respond.data.get("image_name"),
+                         mimetype='image/jpeg',
+                         as_attachment=True)
     except Exception as e:
         LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
         return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
