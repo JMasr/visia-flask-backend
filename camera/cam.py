@@ -25,7 +25,8 @@ class Camera:
         self.captureCommand = "Capture"
 
         # Check if the program is installed and running
-        exe_response = self.run_digicam()
+        self.run_digicam()
+        # exe_response = self.run_digicam()
         # Configure the camera
         # if exe_response.success:
         #     self.config_camera(config)
@@ -72,17 +73,17 @@ class Camera:
         :return: BasicResponse indicating the success of the operation with a message.
         """
         try:
-            response_1 = self.set_iso(config.iso)
-            response_2 = self.set_aperture(config.aperture)
-            response_3 = self.set_exposure_comp(config.exposure_comp)
-            response_4 = self.set_shutterspeed(config.shutter_speed)
-            response_5 = self.set_autofocus(config.autofocus)
-            response_6 = self.set_compression(config.compression)
-            response_7 = self.set_whitebalance(config.white_balance)
-            response_8 = self.set_counter(config.counter)
-            response_9 = self.set_image_name(config.image_name)
-            response_10 = self.set_transfer(config.transfer_mode)
-            response_11 = self.set_folder(config.storage_path)
+            self.set_iso(config.iso)
+            self.set_aperture(config.aperture)
+            self.set_exposure_comp(config.exposure_comp)
+            self.set_shutterspeed(config.shutter_speed)
+            self.set_autofocus(config.autofocus)
+            self.set_compression(config.compression)
+            self.set_whitebalance(config.white_balance)
+            self.set_counter(config.counter)
+            self.set_image_name(config.image_name)
+            self.set_transfer(config.transfer_mode)
+            self.set_folder(config.storage_path)
 
             # Log the configuration of the camera as a dict
             logger.info(f"Camera configuration: {config.model_dump()}")
@@ -94,31 +95,95 @@ class Camera:
 
             return BasicResponse(success=False, status_code=500, message="Camera configuration failed")
 
-    def capture(self, location: str = None) -> DataResponse:
+    def capture(self, location: str = None) -> BasicResponse:
         """
         Takes a photo - filename and location can be specified in string location, otherwise the default will be used.
         :param location: Location and filename of the image to be saved.
-        :return: an integer indicating the success of the operation
+        :return: a DataResponse indicating the success of the operation with a message and the path of the image.
         """
         if location is None:
             image_name = self.config.image_name + "_" + time.strftime('%Y%m%d_%H%M%S') + ".jpg"
             location = os.path.join(self.config.storage_path, image_name)
+        else:
+            image_name = os.path.basename(location)
 
         try:
-            r = self.run_cmd(self.captureCommand + " " + location)
-            if r == 0:
+            cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", self.captureCommand, location]
+            response = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
+            if response.returncode == 0:
                 logger.info(f"Camera: Image capture - Location: {location}")
+
+                # Load the image as bytes and delete the file
+                with open(location, "rb") as image:
+                    image_bytes = image.read()
+                os.remove(location)
+
                 return DataResponse(success=True,
-                                    data={"path": location},
+                                    data={"image": image_bytes, "image_name": image_name},
                                     status_code=200,
                                     message=f"Camera: Image capture - Location: {location}")
             else:
-                logger.error(f"Camera: Image capture failed - Status: {r}")
+                logger.error(f"Camera: Image capture failed - Status: {response.returncode}")
                 return BasicResponse(success=False, status_code=500,
-                                     message=f"Camera: Image capture failed - Status: {r}")
+                                     message=f"Camera: Image capture failed - Status: {response.returncode}")
         except Exception as e:
             logger.error(f"Camera: Image capture failed - Error: {e}")
             return BasicResponse(success=False, status_code=500, message=f"Camera: Image capture failed - Error: {e}")
+
+    def capture_video(self, location: str = None, duration: float = 420) -> BasicResponse:
+        """
+        Takes a video - filename and location can be specified in string location, otherwise the default will be used.
+        :param location: Location and filename of the video to be saved.
+        :param duration: Duration of the video in seconds. Default = 420
+        :return: a DataResponse indicating the success of the operation with a message and the path of the video.
+        """
+        self.show_live_view()
+        self.run_cmd("do StartRecord")
+        time.sleep(duration)
+        self.run_cmd("do StopRecord")
+        self.run_cmd("do LiveViewWnd_Hide")
+        return BasicResponse(success=True, status_code=200, message=f"Camera: Video capture - Location: {location}")
+
+    def start_recording(self, location: str = None) -> BasicResponse:
+        """
+        Start recording a video - filename and location can be specified in string location, otherwise the default will
+        be used.
+        :param location: Location and filename of the video to be saved.
+        :return: BasicResponse indicating the success of the operation with a message.
+        """
+        if location is None:
+            video_name = self.config.image_name + "_" + time.strftime('%Y%m%d_%H%M%S') + ".mp4"
+            location = os.path.join(self.config.storage_path, video_name)
+
+        try:
+            # Start the live view window
+            cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", "do", "LiveViewWnd_Show"]
+            response = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
+            response_str = str(response.stdout)
+            if "no camera is connected" in response_str:
+                logger.error(f"Camera: Live view start failed - Status: No camera is connected")
+                return BasicResponse(success=False, status_code=500, message=f"Error: No camera is connected")
+
+            elif 'response:""' in response_str or 'response:null' in response_str:
+                logger.info(f"Camera: Live view started")
+                # Start recording
+                cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", "do", "StartRecord"]
+                response = subprocess.run(cmd, capture_output=True)
+                if 'response:""' in str(response.stdout):
+                    logger.info(f"Camera: Recording started - Location: {location}")
+                    return BasicResponse(success=True, status_code=200,
+                                         message=f"Camera: Recording started - Location: {location}")
+                else:
+                    logger.error(f"Camera: Recording start failed - Status: {response.returncode}")
+                    return BasicResponse(success=False, status_code=500,
+                                         message=f"Camera: Recording start failed - Status: {response.returncode}")
+            else:
+                logger.error(f"Camera: Live view start failed - Status: {response.returncode}")
+                return BasicResponse(success=False, status_code=500,
+                                     message=f"Camera: Live view start failed - Status: {response.returncode}")
+        except Exception as e:
+            logger.error(f"Camera: Recording start failed - Error: {e}")
+            return BasicResponse(success=False, status_code=500, message=f"Camera: Recording start failed - Error: {e}")
 
     # %% Capture
 
@@ -322,6 +387,7 @@ class Camera:
         return self.__list_cmd("whitebalance")
 
     # %% Commands
+
     def run_cmd(self, cmd: str) -> int:
         """
         Run a generic command directly with CameraControlRemoteCmd.exe
