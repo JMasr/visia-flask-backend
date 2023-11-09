@@ -1,7 +1,7 @@
-import io
 import os
+import time
 
-from flask import Flask, request, redirect, send_from_directory, send_file, Response
+from flask import Flask, request, redirect, send_from_directory
 from flask_cors import CORS, cross_origin
 from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
 from flask_mongoengine import MongoEngine
@@ -10,7 +10,7 @@ from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
 from camera.cam import Camera
-from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicServerConfig, BasicCameraConfig, logger
+from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicServerConfig, logger, BasicCameraConfig
 from database.basic_mongo import *
 from frontData.basic_record_types import BasicRecordSessionData
 from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
@@ -55,9 +55,7 @@ logger.info(f'MongoDB: http://{mongo_config.host}:{mongo_config.port}'
 logger.info(f'UI: {react_app.host}:{react_app.port} - Status: {"UP" if react_app.server_is_up() else "DOWN"}')
 
 # Configure the camera if a config file is present
-camera_config = BasicCameraConfig(path_to_config="")
-camera_config.load_config()
-camera = Camera(config=camera_config)
+camera = Camera()
 
 
 # Endpoints Section
@@ -88,7 +86,6 @@ def index():
     A simple endpoint with a welcome message from the Backend.
     :return: A welcome message from the Backend.
     """
-    flask_app.load_config()
     return 'Welcome to the backend!'
 
 
@@ -284,13 +281,17 @@ configure_uploads(app, (uploads,))
 @app.route('/video/digicam/makeVideo', methods=['GET'])
 # @jwt_required()
 @cross_origin()
-def record_video() -> str:
+def record_video(duration: float = 10) -> str:
     """
     Endpoint to record a video file using DigicamControl.
+    @param duration: The duration of the video in seconds.
     """
-    # TODO: Implement this endpoint
+    if not camera.is_running:
+        camera.run_digicam()
     try:
         camera_response = camera.start_recording()
+        time.sleep(duration)
+        camera_response = camera.stop_recording()
         LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Video recorded").save()
         return BasicResponse(success=True, status_code=200, message="Video recorded successfully").model_dump_json()
     except Exception as e:
@@ -298,20 +299,53 @@ def record_video() -> str:
         return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
 
 
-@app.route('/video/digicam/takePicture', methods=['GET'])
+@app.route('/video/digicam/startVideo', methods=['GET'])
 # @jwt_required()
 @cross_origin()
-def take_picture() -> Response | str:
+def digicam_start_video() -> str:
     """
-    Endpoint to take a picture using DigicamControl.
+    Endpoint to start recording a video file using DigicamControl.
+    @return: A BasicResponse with a message and a status code.
     """
+    logger.info(f"127.0.0.1 - - [{get_now_standard()}] \"GET /video/digicam/startVideo\"")
+    if not camera.is_running:
+        camera.run_digicam()
     try:
-        camera_respond = camera.capture()
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Picture taken").save()
-        return send_file(io.BytesIO(camera_respond.data.get("image")),
-                         download_name=camera_respond.data.get("image_name"),
-                         mimetype='image/jpeg',
-                         as_attachment=True)
+        camera_response = camera.start_recording()
+        if camera_response.success:
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                        message="Video recording started").save()
+            return BasicResponse(success=True, status_code=200, message="Video recording started").model_dump_json()
+        else:
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
+                        message="Video recording not started").save()
+            return BasicResponse(success=False, status_code=400,
+                                 message="Video recording not started").model_dump_json()
+    except Exception as e:
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
+
+
+@app.route('/video/digicam/stopVideo', methods=['GET'])
+# @jwt_required()
+@cross_origin()
+def digicam_stop_video() -> str:
+    """
+    Endpoint to stop recording a video file using DigicamControl.
+    @return: A BasicResponse with a message and a status code.
+    """
+    logger.info(f"{request.remote_addr} - - [{get_now_standard()}] \"GET /video/digicam/stopVideo\"")
+    try:
+        camera_response = camera.stop_recording()
+        if camera_response.success:
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
+                        message="Video recording stopped").save()
+            return BasicResponse(success=True, status_code=200, message="Video recording stopped").model_dump_json()
+        else:
+            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
+                        message="Video recording not stopped").save()
+            return BasicResponse(success=False, status_code=400,
+                                 message="Video recording not stopped").model_dump_json()
     except Exception as e:
         LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
         return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
@@ -320,17 +354,15 @@ def take_picture() -> Response | str:
 @app.route('/video/uploads', methods=['POST'])
 @jwt_required()
 @cross_origin()
-def upload_video() -> str:
+def upload_video(save_test: bool = True) -> str:
     """
     Endpoint to upload a video file to the server.
     :return: A BasicResponse with a message and a status code.
     """
+    logger.info(f"127.0.0.1 - - [{get_now_standard()}] \"POST /video/uploads\"")
     try:
         # Get the video file from the request
         video = request.files.get('video')
-
-        # Save the video file to a specified path
-        # save = os.path.join(upload_files, f"video.filename.mkv")
 
         video_buffer = video.stream.read()
         video_encrypted = security_config.encryptor_backend.encrypt_object(video_buffer)
@@ -339,6 +371,17 @@ def upload_video() -> str:
         crd_id = request.form.get('crd_id', "UNK")
         patient_id = request.form.get('patient_id', "UNK")
         file_name = request.form.get('file_name', f"{crd_id}--{patient_id}--{get_now_standard()}.mkv")
+
+        # Log the data from the request
+        logger.info(f"FrontEnd: Data send - CRD: {crd_id} - Patient: {patient_id} - File: {file_name}")
+
+        if save_test:
+            # Save the video file as a new file
+            os.makedirs(upload_files, exist_ok=True)
+            path_video = os.path.join(upload_files, file_name)
+            with open(path_video, 'wb') as f:
+                f.write(video_buffer)
+            logger.info(f"BackEnd: Video saved - CRD: {crd_id} - Patient: {patient_id} - File: {path_video}")
 
         # Create a VideoAction
         video_act = VideoActionsMongoDB(crd_id=crd_id, patient_id=patient_id, filename=file_name)
@@ -358,6 +401,7 @@ def upload_video() -> str:
         LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
 
+    logger.info(f"127.0.0.1 - - [{get_now_standard()}] \"POST /video/uploads\" - {response.model_dump_json()}")
     return response.model_dump_json()
 
 
