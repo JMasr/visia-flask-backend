@@ -2,8 +2,6 @@ import os
 import pickle
 from datetime import datetime
 
-import cv2
-
 
 def get_now_standard() -> str:
     """
@@ -43,39 +41,3 @@ def load_obj(path_2_pkl: str) -> object:
     except Exception or IOError as e:
         print(f"Error loading object: {e}")
         return None
-
-
-def get_video_properties(video_path):
-    # Open the video file
-    cap = cv2.VideoCapture(video_path)
-
-    if not cap.isOpened():
-        print("Error: Could not open video file.")
-        return
-
-    # Get video properties
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    codec = int(cap.get(cv2.CAP_PROP_FOURCC))
-
-    # Convert codec to four-character code
-    codec_fourcc = chr(codec & 0xFF) + chr((codec >> 8) & 0xFF) + chr((codec >> 16) & 0xFF) + chr((codec >> 24) & 0xFF)
-
-    # Print video properties
-    print(f"FPS: {fps}")
-    print(f"Frame Count: {frame_count}")
-    print(f"Resolution: {width}x{height}")
-    print(f"Codec: {codec_fourcc}")
-
-    # Release the video file
-    cap.release()
-
-
-if __name__ == "__main__":
-    video_path = r"C:\Users\jmram\Documents\GitHub\visia\visia-flask-backend\uploads\test\digcam.MP4"
-    if os.path.exists(video_path):
-        get_video_properties(video_path)
-    else:
-        print("Error: Video file does not exist.")
