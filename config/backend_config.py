@@ -328,6 +328,7 @@ class BasicLoggerConfig:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
         # Create a file handler to store logs in a file
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
         file_handler = RotatingFileHandler(log_file, maxBytes=max_log_size, backupCount=backup_count)
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
@@ -348,7 +349,7 @@ class BasicCameraConfig(BaseModel):
     iso: int = 100
     aperture: float = 2.8
     exposure_comp: str = "0"
-    shutter_speed: str = "1/100"
+    shutter_speed: str = "1/125"
 
     auto_focus: bool = True
     compression: str = "RAW"
@@ -356,7 +357,7 @@ class BasicCameraConfig(BaseModel):
 
     counter: int = 0
     transfer_mode: str = "Save_to_PC_only"
-    image_name: str = "visia_crd"
+    image_name: str = "visia_video_[Date yyyy-MM-dd]"
     storage_path: str = os.path.join(os.getcwd(), "uploads")
 
     type: str = "Camera"
@@ -366,8 +367,8 @@ class BasicCameraConfig(BaseModel):
         Load the configuration from the JSON file.
         """
         if not os.path.exists(self.path_to_config):
-            logger.error(f"Camera: Error loading credentials from file - Location: {self.path_to_config}")
-            logger.error("Camera: Using default credentials")
+            logger.warning(f"Camera: Loading credentials, config file not found - Location: {self.path_to_config}")
+            logger.info("Camera: Using default credentials")
         else:
             try:
                 credentials_json = self.load_config_from_json(self.path_to_config)
@@ -376,9 +377,10 @@ class BasicCameraConfig(BaseModel):
                     if attr in credentials_json:
                         self.__setattr__(attr, credentials_json[attr])
                 logger.info("Camera: Configuration loaded successfully")
-                logger.info(f"Camera: Configuration read - {self.model_dump()}")
             except Exception as e:
                 logger.error(f"Camera: Error loading configuration - {e}")
+
+        logger.info(f"Camera: Configuration read - {self.model_dump()}")
 
     @staticmethod
     def load_config_from_json(path: str) -> Any | None:
