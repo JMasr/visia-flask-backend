@@ -19,7 +19,7 @@ def save_obj(pickle_name: str, obj: object) -> bool:
     """
     try:
         os.makedirs(os.path.dirname(pickle_name), exist_ok=True)
-        with open(pickle_name, 'wb') as handle:
+        with open(pickle_name, "wb") as handle:
             pickle.dump(obj, handle, 0)
         return True
     except Exception or IOError as e:
@@ -34,7 +34,7 @@ def load_obj(path_2_pkl: str) -> object:
     """
     try:
         if os.path.exists(path_2_pkl):
-            with open(path_2_pkl, 'rb') as pkl_file:
+            with open(path_2_pkl, "rb") as pkl_file:
                 return pickle.load(pkl_file)
         else:
             return None

@@ -20,7 +20,11 @@ class Camera:
         @:param config: Configuration of the camera as a BasicCameraConfig object.
         """
         if cam_config is None:
-            cam_config = BasicCameraConfig(path_to_config=os.path.join(os.getcwd(), 'secrets', 'camera_config.json'))
+            cam_config = BasicCameraConfig(
+                path_to_config=os.path.join(
+                    os.getcwd(), "secrets", "camera_config.json"
+                )
+            )
             cam_config.load_config()
 
         self.config: BasicCameraConfig = cam_config
@@ -47,10 +51,14 @@ class Camera:
             if not ("CameraControl.exe" in (i.name() for i in psutil.process_iter())):
                 cam_response = self.open_program()
                 if not cam_response.success:
-                    logger.error(f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}")
+                    logger.error(
+                        f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}"
+                    )
                     return False
                 else:
-                    logger.info(f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}")
+                    logger.info(
+                        f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}"
+                    )
                     time.sleep(10)
                     return True
             else:
@@ -58,6 +66,7 @@ class Camera:
         except Exception as e:
             logger.error(f"digiCamControl: @{self.exeDir} - Status: {e}")
             return False
+
     def run_digicam(self) -> BasicResponse:
         """
         Run the digiCamControl program.
@@ -69,15 +78,27 @@ class Camera:
             if not ("CameraControl.exe" in (i.name() for i in psutil.process_iter())):
                 cam_response = self.open_program()
                 if not cam_response.success:
-                    logger.error(f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}")
+                    logger.error(
+                        f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}"
+                    )
                 else:
-                    logger.info(f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}")
+                    logger.info(
+                        f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}"
+                    )
                     time.sleep(10)
             else:
-                cam_response = BasicResponse(success=True, status_code=200, message="CameraControl.exe is running")
+                cam_response = BasicResponse(
+                    success=True,
+                    status_code=200,
+                    message="CameraControl.exe is running",
+                )
         else:
             logger.error(f"digiCamControl: @{self.exeDir} - Status: Not installed")
-            cam_response = BasicResponse(success=False, status_code=500, message="CameraControl.exe is not installed")
+            cam_response = BasicResponse(
+                success=False,
+                status_code=500,
+                message="CameraControl.exe is not installed",
+            )
         return cam_response
 
     def open_program(self) -> BasicResponse:
@@ -88,10 +109,18 @@ class Camera:
         try:
             subprocess.Popen(self.exeDir + r"/CameraControl.exe")
             logger.info(f"digiCamControl: @{self.exeDir} - Status: UP")
-            return BasicResponse(success=True, status_code=200, message="CameraControl.exe is running")
+            return BasicResponse(
+                success=True,
+                status_code=200,
+                message="CameraControl.exe is running",
+            )
         except Exception as e:
             logger.error(f"digiCamControl: @{self.exeDir} - Status: {e}")
-            return BasicResponse(success=False, status_code=500, message="CameraControl.exe is not running")
+            return BasicResponse(
+                success=False,
+                status_code=500,
+                message="CameraControl.exe is not running",
+            )
 
     def config_camera(self, config: BasicCameraConfig) -> BasicResponse:
         """
@@ -115,12 +144,20 @@ class Camera:
             # Log the configuration of the camera as a dict
             logger.info(f"Camera configuration: {config.model_dump()}")
 
-            return BasicResponse(success=True, status_code=200, message="Camera configuration successful")
+            return BasicResponse(
+                success=True,
+                status_code=200,
+                message="Camera configuration successful",
+            )
         except Exception as e:
             # Log the configuration of the camera as a dict
             logger.error(f"Camera configuration failed: {e}")
 
-            return BasicResponse(success=False, status_code=500, message="Camera configuration failed")
+            return BasicResponse(
+                success=False,
+                status_code=500,
+                message="Camera configuration failed",
+            )
 
     def capture(self, location: str = None) -> BasicResponse:
         """
@@ -129,13 +166,20 @@ class Camera:
         :return: a DataResponse indicating the success of the operation with a message and the path of the image.
         """
         if location is None:
-            image_name = self.config.image_name + "_" + time.strftime('%Y%m%d_%H%M%S') + ".jpg"
+            image_name = (
+                self.config.image_name + "_" + time.strftime("%Y%m%d_%H%M%S") + ".jpg"
+            )
             location = os.path.join(self.config.storage_path, image_name)
         else:
             image_name = os.path.basename(location)
 
         try:
-            cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", self.captureCommand, location]
+            cmd = [
+                os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
+                "/c",
+                self.captureCommand,
+                location,
+            ]
             response = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
             if response.returncode == 0:
                 logger.info(f"Camera: Image capture - Location: {location}")
@@ -145,19 +189,32 @@ class Camera:
                     image_bytes = image.read()
                 os.remove(location)
 
-                return DataResponse(success=True,
-                                    data={"image": image_bytes, "image_name": image_name},
-                                    status_code=200,
-                                    message=f"Camera: Image capture - Location: {location}")
+                return DataResponse(
+                    success=True,
+                    data={"image": image_bytes, "image_name": image_name},
+                    status_code=200,
+                    message=f"Camera: Image capture - Location: {location}",
+                )
             else:
-                logger.error(f"Camera: Image capture failed - Status: {response.returncode}")
-                return BasicResponse(success=False, status_code=500,
-                                     message=f"Camera: Image capture failed - Status: {response.returncode}")
+                logger.error(
+                    f"Camera: Image capture failed - Status: {response.returncode}"
+                )
+                return BasicResponse(
+                    success=False,
+                    status_code=500,
+                    message=f"Camera: Image capture failed - Status: {response.returncode}",
+                )
         except Exception as e:
             logger.error(f"Camera: Image capture failed - Error: {e}")
-            return BasicResponse(success=False, status_code=500, message=f"Camera: Image capture failed - Error: {e}")
+            return BasicResponse(
+                success=False,
+                status_code=500,
+                message=f"Camera: Image capture failed - Error: {e}",
+            )
 
-    def capture_video(self, location: str = None, duration: float = 420) -> BasicResponse:
+    def capture_video(
+        self, location: str = None, duration: float = 420
+    ) -> BasicResponse:
         """
         Takes a video - filename and location can be specified in string location, otherwise the default will be used.
         :param location: Location and filename of the video to be saved.
@@ -169,7 +226,11 @@ class Camera:
         time.sleep(duration)
         self.run_cmd("do StopRecord")
         self.run_cmd("do LiveViewWnd_Hide")
-        return BasicResponse(success=True, status_code=200, message=f"Camera: Video capture - Location: {location}")
+        return BasicResponse(
+            success=True,
+            status_code=200,
+            message=f"Camera: Video capture - Location: {location}",
+        )
 
     def start_recording(self) -> BasicResponse:
         """
@@ -179,34 +240,63 @@ class Camera:
         """
         try:
             # Start the live view window
-            cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", "do", "LiveViewWnd_Show"]
+            cmd = [
+                os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
+                "/c",
+                "do",
+                "LiveViewWnd_Show",
+            ]
             response_cmd = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
             response_cmd = str(response_cmd.stdout)
             if "no camera is connected" in response_cmd:
-                logger.error(f"Camera: Live view start failed - Status: No camera is connected")
-                return BasicResponse(success=False, status_code=500, message=f"Error: No camera is "
-                                                                             f"connected")
-            elif 'response:""' in response_cmd or 'response:null' in response_cmd:
+                logger.error(
+                    f"Camera: Live view start failed - Status: No camera is connected"
+                )
+                return BasicResponse(
+                    success=False,
+                    status_code=500,
+                    message=f"Error: No camera is " f"connected",
+                )
+            elif 'response:""' in response_cmd or "response:null" in response_cmd:
                 logger.info(f"Camera: Live view started - Status: {response_cmd}")
                 # Start recording
-                cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", "do", "StartRecord"]
+                cmd = [
+                    os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
+                    "/c",
+                    "do",
+                    "StartRecord",
+                ]
                 response_cmd = subprocess.run(cmd, capture_output=True)
                 if 'response:""' in str(response_cmd.stdout):
                     logger.info(f"Camera: Recording started")
-                    return BasicResponse(success=True, status_code=200,
-                                         message=f"Camera: Recording started")
+                    return BasicResponse(
+                        success=True,
+                        status_code=200,
+                        message=f"Camera: Recording started",
+                    )
                 else:
-                    logger.error(f"Camera: Recording start failed - Status: {response_cmd.returncode}")
-                    return BasicResponse(success=False, status_code=500,
-                                         message=f"Camera: Recording failed - Status: {response_cmd}")
+                    logger.error(
+                        f"Camera: Recording start failed - Status: {response_cmd.returncode}"
+                    )
+                    return BasicResponse(
+                        success=False,
+                        status_code=500,
+                        message=f"Camera: Recording failed - Status: {response_cmd}",
+                    )
             else:
                 logger.error(f"Camera: Live view start failed - Status: {response_cmd}")
-                return BasicResponse(success=False, status_code=500,
-                                     message=f"Camera: LiveViewWnd failed - Status: {response_cmd}")
+                return BasicResponse(
+                    success=False,
+                    status_code=500,
+                    message=f"Camera: LiveViewWnd failed - Status: {response_cmd}",
+                )
         except Exception as e:
             logger.error(f"Camera: Recording start failed - Error: {e}")
-            return BasicResponse(success=False, status_code=500,
-                                 message=f"Camera: Recording failed - Error: {e}")
+            return BasicResponse(
+                success=False,
+                status_code=500,
+                message=f"Camera: Recording failed - Error: {e}",
+            )
 
     def stop_recording(self):
         """
@@ -216,23 +306,45 @@ class Camera:
         """
         try:
             # Stop recording
-            cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", "do", "StopRecord"]
+            cmd = [
+                os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
+                "/c",
+                "do",
+                "StopRecord",
+            ]
             response = subprocess.run(cmd, capture_output=True)
             if 'response:""' in str(response.stdout):
                 logger.info(f"Camera: Recording stopped")
 
                 # Hide the live view window
-                cmd = [os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"), "/c", "do", "LiveViewWnd_Hide"]
+                cmd = [
+                    os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
+                    "/c",
+                    "do",
+                    "LiveViewWnd_Hide",
+                ]
                 response = subprocess.run(cmd, capture_output=True)
-                return BasicResponse(success=True, status_code=200,
-                                     message=f"Camera: Recording stopped")
+                return BasicResponse(
+                    success=True,
+                    status_code=200,
+                    message=f"Camera: Recording stopped",
+                )
             else:
-                logger.error(f"Camera: Recording stop failed - Status: {response.returncode}")
-                return BasicResponse(success=False, status_code=500,
-                                     message=f"Camera: Recording stop failed - Status: {response.returncode}")
+                logger.error(
+                    f"Camera: Recording stop failed - Status: {response.returncode}"
+                )
+                return BasicResponse(
+                    success=False,
+                    status_code=500,
+                    message=f"Camera: Recording stop failed - Status: {response.returncode}",
+                )
         except Exception as e:
             logger.error(f"Camera: Recording stop failed - Error: {e}")
-            return BasicResponse(success=False, status_code=500, message=f"Camera: Recording stop failed - Error: {e}")
+            return BasicResponse(
+                success=False,
+                status_code=500,
+                message=f"Camera: Recording stop failed - Error: {e}",
+            )
 
     # %% Capture
 
@@ -324,10 +436,18 @@ class Camera:
         response = self.__set_cmd("Iso", str(iso))
         if response == 0:
             logger.info(f"Camera: ISO set to {iso}")
-            return BasicResponse(success=True, status_code=200, message=f"Camera: ISO set to {iso}")
+            return BasicResponse(
+                success=True,
+                status_code=200,
+                message=f"Camera: ISO set to {iso}",
+            )
         else:
             logger.error(f"Camera: ISO set failed - Status: {response}")
-            return BasicResponse(success=False, status_code=500, message=f"Camera: ISO set failed - Status: {response}")
+            return BasicResponse(
+                success=False,
+                status_code=500,
+                message=f"Camera: ISO set failed - Status: {response}",
+            )
 
     def get_iso(self):
         """
@@ -443,9 +563,11 @@ class Camera:
         :param cmd: Command to run on digiCamControl
         :return: Value indicating the success of the operation
         """
-        r = subprocess.check_output("cd %s && CameraControlRemoteCmd.exe /c %s" % (self.exeDir, cmd),
-                                    shell=True).decode()
-        if 'null' in r:  # Success
+        r = subprocess.check_output(
+            "cd %s && CameraControlRemoteCmd.exe /c %s" % (self.exeDir, cmd),
+            shell=True,
+        ).decode()
+        if "null" in r:  # Success
             return 0
         elif r'""' in r:  # Success
             return 0
@@ -460,9 +582,12 @@ class Camera:
         :param value: Value to set the command to
         :return: Value indicating the success of the operation
         """
-        r = subprocess.check_output("cd %s && CameraControlRemoteCmd.exe /c set %s" % (self.exeDir, cmd + " " + value),
-                                    shell=True).decode()
-        if 'null' in r:  # Success
+        r = subprocess.check_output(
+            "cd %s && CameraControlRemoteCmd.exe /c set %s"
+            % (self.exeDir, cmd + " " + value),
+            shell=True,
+        ).decode()
+        if "null" in r:  # Success
             print("Set the %s to %s" % (cmd, value))
             return 0
         else:  # Error
@@ -475,9 +600,11 @@ class Camera:
         :param cmd: Command to run on digiCamControl
         :return: Value indicating the success of the operation
         """
-        r = subprocess.check_output("cd %s && CameraControlRemoteCmd.exe /c get %s" % (self.exeDir, cmd),
-                                    shell=True).decode()
-        if 'Unknown parameter' in r:  # Error
+        r = subprocess.check_output(
+            "cd %s && CameraControlRemoteCmd.exe /c get %s" % (self.exeDir, cmd),
+            shell=True,
+        ).decode()
+        if "Unknown parameter" in r:  # Error
             print("Error: %s" % r[109:])  # Format output message
             return -1
         else:  # Success
@@ -491,13 +618,17 @@ class Camera:
         :param cmd: Command to run on digiCamControl
         :return: Value indicating the success of the operation
         """
-        r = subprocess.check_output("cd %s && CameraControlRemoteCmd.exe /c list %s" % (self.exeDir, cmd),
-                                    shell=True).decode()
-        if 'Unknown parameter' in r:  # Error
+        r = subprocess.check_output(
+            "cd %s && CameraControlRemoteCmd.exe /c list %s" % (self.exeDir, cmd),
+            shell=True,
+        ).decode()
+        if "Unknown parameter" in r:  # Error
             print("Error: %s" % r[109:])  # Format output message
             return -1
         else:  # Success
             return_list = r[96:-6].split(",")  # Format response and turn into a list
             return_list = [e[1:-1] for e in return_list]  # Remove "" from string
-            print("List of all possible %ss: %s" % (cmd, return_list))  # Format output message
+            print(
+                "List of all possible %ss: %s" % (cmd, return_list)
+            )  # Format output message
             return return_list

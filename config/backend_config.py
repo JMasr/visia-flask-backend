@@ -25,6 +25,7 @@ class BasicServerConfig(BaseModel):
     @:param port: Port of the frontend
     @:param is_up: True if the frontend service is up, False otherwise
     """
+
     host: str = "http://localhost"
     port: int = 8080
     type: str = "Frontend"
@@ -99,7 +100,7 @@ class BasicServerConfig(BaseModel):
         """
         try:
             if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
             else:
                 return None
@@ -117,7 +118,7 @@ def save_config_as_json(config: dict, path: str) -> bool:
     """
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=4)
             return True
     except Exception or IOError as e:
@@ -137,6 +138,7 @@ class BasicMongoConfig(BaseModel):
     @:param backup_path: Path to save the backups
     @:param credentials: Path to the credentials file.
     """
+
     db: str = ""
     username: str = ""
     password: str = ""
@@ -180,11 +182,13 @@ class BasicMongoConfig(BaseModel):
         Dump the model data as a dictionary.
         :return: A dict with the model data.
         """
-        dump = {"db": self.db,
-                "username": self.username,
-                "password": self.password,
-                "host": self.host,
-                "port": self.port}
+        dump = {
+            "db": self.db,
+            "username": self.username,
+            "password": self.password,
+            "host": self.host,
+            "port": self.port,
+        }
 
         return dump
 
@@ -195,9 +199,12 @@ class BasicMongoConfig(BaseModel):
         """
         try:
             # Check if the MongoDB service is up
-            client = MongoClient(f'mongodb://{self.host}:{self.port}/', serverSelectionTimeoutMS=2000)
+            client = MongoClient(
+                f"mongodb://{self.host}:{self.port}/",
+                serverSelectionTimeoutMS=2000,
+            )
             # Ping the MongoDB server
-            self.is_up = client.admin.command('ping')
+            self.is_up = client.admin.command("ping")
             # Close the MongoClient
             client.close()
         except Exception or ConnectionError as e:
@@ -239,7 +246,7 @@ class BasicMongoConfig(BaseModel):
         """
         try:
             if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
             else:
                 return None
@@ -258,7 +265,9 @@ class BasicSecurityConfig:
 
     def __init__(self, path_to_secrets: str):
         self.path_to_secrets: str = path_to_secrets
-        self.secret: bytes = self._load_encryption_key(os.path.join(self.path_to_secrets, "secret.pkl"))
+        self.secret: bytes = self._load_encryption_key(
+            os.path.join(self.path_to_secrets, "secret.pkl")
+        )
         # Encryption Section
         self.encryptor_backend = ObjectEncryptor(key=self.secret)
 
@@ -271,14 +280,14 @@ class BasicSecurityConfig:
         """
         try:
             # Load the encryption key using pickle
-            with open(path_to, 'rb') as file:
+            with open(path_to, "rb") as file:
                 self.secret_key = pickle.load(file)
         except FileNotFoundError:
             # Create a new encryption key
             os.makedirs(os.path.dirname(path_to), exist_ok=True)
             self.secret_key = Fernet.generate_key()
             # Save the encryption key using pickle
-            with open(path_to, 'wb') as file:
+            with open(path_to, "wb") as file:
                 pickle.dump(self.secret_key, file)
         return self.secret_key
 
@@ -299,37 +308,68 @@ class BasicSecurityConfig:
                 # Save the user in the database
                 new_user.save()
 
-                LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                            message=f"User added: {username}").save()
-                response = BasicResponse(success=True, status_code=200, message="User added: successfully")
+                LogDocument(
+                    log_origin=LogOrigins.BACKEND.value,
+                    log_type=log_type_info,
+                    message=f"User added: {username}",
+                ).save()
+                response = BasicResponse(
+                    success=True,
+                    status_code=200,
+                    message="User added: successfully",
+                )
             else:
-                LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                            message=f"User already exists: {username}").save()
-                response = BasicResponse(success=True, status_code=400, message="User already exists")
+                LogDocument(
+                    log_origin=LogOrigins.BACKEND.value,
+                    log_type=log_type_info,
+                    message=f"User already exists: {username}",
+                ).save()
+                response = BasicResponse(
+                    success=True,
+                    status_code=400,
+                    message="User already exists",
+                )
         except ValueError as e:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message=f"Invalid Value: {e}").save()
-            response = BasicResponse(success=False, status_code=400, message=f'Invalid Value: {e}')
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message=f"Invalid Value: {e}",
+            ).save()
+            response = BasicResponse(
+                success=False, status_code=400, message=f"Invalid Value: {e}"
+            )
         except Exception as e:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message=str(e)).save()
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message=str(e),
+            ).save()
             response = BasicResponse(success=False, status_code=500, message=str(e))
 
         return response
 
 
 class BasicLoggerConfig:
-    def __init__(self, log_file: str, log_name: str = "Visia-BackEnd_Logger", max_log_size: int = (5 * 1024 * 1024),
-                 backup_count: int = 3):
+    def __init__(
+        self,
+        log_file: str,
+        log_name: str = "Visia-BackEnd_Logger",
+        max_log_size: int = (5 * 1024 * 1024),
+        backup_count: int = 3,
+    ):
         self.logger = logging.getLogger(log_name)
         self.logger.setLevel(logging.INFO)
 
         # Create a formatter to add the time, name, level and message of the log
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
 
         # Create a file handler to store logs in a file
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        file_handler = RotatingFileHandler(log_file, maxBytes=max_log_size, backupCount=backup_count)
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=max_log_size, backupCount=backup_count
+        )
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
 
@@ -367,7 +407,9 @@ class BasicCameraConfig(BaseModel):
         Load the configuration from the JSON file.
         """
         if not os.path.exists(self.path_to_config):
-            logger.warning(f"Camera: Loading credentials, config file not found - Location: {self.path_to_config}")
+            logger.warning(
+                f"Camera: Loading credentials, config file not found - Location: {self.path_to_config}"
+            )
             logger.info("Camera: Using default credentials")
         else:
             try:
@@ -391,7 +433,7 @@ class BasicCameraConfig(BaseModel):
         """
         try:
             if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
             else:
                 return None
@@ -401,5 +443,7 @@ class BasicCameraConfig(BaseModel):
 
 
 # Create a logger
-logger_config = BasicLoggerConfig(log_file=os.path.join(os.getcwd(), 'logs', 'backend.log'))
+logger_config = BasicLoggerConfig(
+    log_file=os.path.join(os.getcwd(), "logs", "backend.log")
+)
 logger = logger_config.get_logger()

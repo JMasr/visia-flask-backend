@@ -6,7 +6,6 @@ from security.basic_encription import ObjectEncryptor
 
 
 class TestObjectEncryptor(unittest.TestCase):
-
     def setUp(self):
         # Generate a temporary key for testing
         key = Fernet.generate_key()
@@ -14,7 +13,7 @@ class TestObjectEncryptor(unittest.TestCase):
         self.encryptor = ObjectEncryptor(key)
 
         # Sample data
-        self.original_data = {'name': 'Alice', 'age': 30}
+        self.original_data = {"name": "Alice", "age": 30}
 
     def test_encryption(self):
         # Encrypt data
@@ -33,5 +32,5 @@ class TestObjectEncryptor(unittest.TestCase):
         self.assertEqual(decrypted_data, self.original_data)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

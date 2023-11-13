@@ -3,18 +3,38 @@ import time
 
 from flask import Flask, request, redirect, send_from_directory
 from flask_cors import CORS, cross_origin
-from flask_jwt_extended import JWTManager, create_access_token, create_refresh_token, jwt_required
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    create_refresh_token,
+    jwt_required,
+)
 from flask_mongoengine import MongoEngine
 from flask_uploads import UploadSet, configure_uploads, ARCHIVES
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
 from camera.cam import Camera
-from config.backend_config import BasicMongoConfig, BasicSecurityConfig, BasicServerConfig, logger, BasicCameraConfig
+from config.backend_config import (
+    BasicMongoConfig,
+    BasicSecurityConfig,
+    BasicServerConfig,
+    logger,
+)
 from database.basic_mongo import *
 from frontData.basic_record_types import BasicRecordSessionData
-from log.basic_log_types import LogOrigins, log_type_warning, log_type_info, log_type_error
-from responses.basic_responses import DataResponse, BasicResponse, ListResponse, TokenResponse
+from log.basic_log_types import (
+    LogOrigins,
+    log_type_warning,
+    log_type_info,
+    log_type_error,
+)
+from responses.basic_responses import (
+    DataResponse,
+    BasicResponse,
+    ListResponse,
+    TokenResponse,
+)
 from utils.backup import BackUp
 from utils.utils import get_now_standard
 
@@ -22,23 +42,29 @@ from utils.utils import get_now_standard
 app = Flask(__name__)
 
 # Configure BackEnd
-flask_app = BasicServerConfig(path_to_config=os.path.join(os.getcwd(), 'secrets', 'backend_config.json'))
+flask_app = BasicServerConfig(
+    path_to_config=os.path.join(os.getcwd(), "secrets", "backend_config.json")
+)
 
 # Configure FrontEnd
-react_app = BasicServerConfig(path_to_config=os.path.join(os.getcwd(), 'secrets', 'frontend_config.json'))
+react_app = BasicServerConfig(
+    path_to_config=os.path.join(os.getcwd(), "secrets", "frontend_config.json")
+)
 react_app.load_config()
 
 # Configure MongoDB
-mongo_config = BasicMongoConfig(path_to_config=os.path.join(os.getcwd(), 'secrets'))
+mongo_config = BasicMongoConfig(path_to_config=os.path.join(os.getcwd(), "secrets"))
 mongo_config.load_credentials()
-app.config['MONGODB_SETTINGS'] = mongo_config.model_dump()
+app.config["MONGODB_SETTINGS"] = mongo_config.model_dump()
 # Initialize MongoDB
 mongo = MongoEngine()
 mongo.init_app(app)
 
 # Set the secret key to enable JWT authentication
-security_config = BasicSecurityConfig(path_to_secrets=os.path.join(os.getcwd(), 'secrets'))
-app.config['JWT_SECRET_KEY'] = security_config.secret
+security_config = BasicSecurityConfig(
+    path_to_secrets=os.path.join(os.getcwd(), "secrets")
+)
+app.config["JWT_SECRET_KEY"] = security_config.secret
 jwt = JWTManager(app)
 
 # Create a backup
@@ -50,9 +76,13 @@ CORS(app, resources={r"/*": {"origins": f"{react_app.host}:{react_app.port}"}})
 # Check the server status
 logger.info("*** Starting the backend ***")
 logger.info("--- Checking the server status ---")
-logger.info(f'MongoDB: http://{mongo_config.host}:{mongo_config.port}'
-            f' - Status: {"UP" if mongo_config.server_is_up() else "DOWN"}')
-logger.info(f'UI: {react_app.host}:{react_app.port} - Status: {"UP" if react_app.server_is_up() else "DOWN"}')
+logger.info(
+    f"MongoDB: http://{mongo_config.host}:{mongo_config.port}"
+    f' - Status: {"UP" if mongo_config.server_is_up() else "DOWN"}'
+)
+logger.info(
+    f'UI: {react_app.host}:{react_app.port} - Status: {"UP" if react_app.server_is_up() else "DOWN"}'
+)
 
 # Configure the camera if a config file is present
 camera = Camera()
@@ -65,7 +95,11 @@ def resource_not_found():
     An error-handler to ensure that 404 errors are returned as JSON.
     :return: A BasicResponse representing a 404 error.
     """
-    response = BasicResponse(success=False, status_code=404, message=f"Resource not found: {request.url}")
+    response = BasicResponse(
+        success=False,
+        status_code=404,
+        message=f"Resource not found: {request.url}",
+    )
     return response.model_dump()
 
 
@@ -75,27 +109,34 @@ def resource_not_found(e):
     An error-handler to ensure that MongoDB duplicate key errors are returned as JSON.
     :return: A BasicResponse representing a duplicate key error from MongoDB.
     """
-    response = BasicResponse(success=False, status_code=500, message=f"Duplicate key error: {str(e)}")
+    response = BasicResponse(
+        success=False,
+        status_code=500,
+        message=f"Duplicate key error: {str(e)}",
+    )
     return response.model_dump_json()
 
 
-@app.route('/')
+@app.route("/")
 @cross_origin()
 def index():
     """
     A simple endpoint with a welcome message from the Backend.
     :return: A welcome message from the Backend.
     """
-    return 'Welcome to the backend!'
+    return "Welcome to the backend!"
 
 
-@app.route('/favicon.ico')
+@app.route("/favicon.ico")
 def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico',
-                               mimetype='image/vnd.microsoft.icon')
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "favicon.ico",
+        mimetype="image/vnd.microsoft.icon",
+    )
 
 
-@app.route('/poll')
+@app.route("/poll")
 @cross_origin()
 def poll():
     """
@@ -104,37 +145,60 @@ def poll():
     """
     try:
         # Initialize a MongoClient
-        client = MongoClient(f'mongodb://{mongo_config.host}:{mongo_config.port}/', serverSelectionTimeoutMS=2000)
+        client = MongoClient(
+            f"mongodb://{mongo_config.host}:{mongo_config.port}/",
+            serverSelectionTimeoutMS=2000,
+        )
         # Ping the MongoDB server
-        is_up = client.admin.command('ping')
+        is_up = client.admin.command("ping")
         # Close the MongoClient
         client.close()
 
         if is_up.get("ok") == 1.0:
-            response = BasicResponse(success=True, message="Flask and MongoDB are UP!", status_code=200)
+            response = BasicResponse(
+                success=True,
+                message="Flask and MongoDB are UP!",
+                status_code=200,
+            )
         else:
-            response = BasicResponse(success=False, message="Flask is UP! and MongoDB is UP but not WORKING!",
-                                     status_code=400)
-    except (Exception or ConnectionError or TimeoutError):
-        response = BasicResponse(success=False, message="Flask is UP! but MongoDB is DOWN!", status_code=503)
+            response = BasicResponse(
+                success=False,
+                message="Flask is UP! and MongoDB is UP but not WORKING!",
+                status_code=400,
+            )
+    except Exception or ConnectionError or TimeoutError:
+        response = BasicResponse(
+            success=False,
+            message="Flask is UP! but MongoDB is DOWN!",
+            status_code=503,
+        )
 
     return response.model_dump_json()
 
 
-@app.route('/login/addUser', methods=['POST'])
+@app.route("/login/addUser", methods=["POST"])
 def add_user():
     """
     Endpoint to add a user to the MongoDB database.
     """
     try:
-        username = request.json.get('username', False)
-        password = request.json.get('password', False)
+        username = request.json.get("username", False)
+        password = request.json.get("password", False)
         if username and password:
-            user = UserDocument(username=username, password=security_config.encryptor_backend.encrypt_object(password))
+            user = UserDocument(
+                username=username,
+                password=security_config.encryptor_backend.encrypt_object(password),
+            )
             user.save()
-            response = BasicResponse(success=True, status_code=200, message="User added successfully")
+            response = BasicResponse(
+                success=True,
+                status_code=200,
+                message="User added successfully",
+            )
         else:
-            response = BasicResponse(success=False, status_code=400, message="Bad request")
+            response = BasicResponse(
+                success=False, status_code=400, message="Bad request"
+            )
     except Exception as e:
         response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()
@@ -142,7 +206,8 @@ def add_user():
 
 # Security Section
 
-@app.route('/requestAccessTokenByUser', methods=['POST'])
+
+@app.route("/requestAccessTokenByUser", methods=["POST"])
 @cross_origin()
 def get_access_token_by_user():
     """
@@ -150,34 +215,55 @@ def get_access_token_by_user():
     :return: A JSON object with a message and a status code.
     """
     try:
-        user_name = request.json.get('username', "UNK")
-        user_pass = request.json.get('password', "UNK")
+        user_name = request.json.get("username", "UNK")
+        user_pass = request.json.get("password", "UNK")
         front_user = UserDocument.objects(username=user_name).first()
 
-        if user_pass == security_config.encryptor_backend.decrypt_object(front_user.password):
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message=f"Successful login: {user_name}").save()
+        if user_pass == security_config.encryptor_backend.decrypt_object(
+                front_user.password
+        ):
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message=f"Successful login: {user_name}",
+            ).save()
 
             access_token = create_access_token(identity=user_name)
             refresh_token = create_refresh_token(identity=user_name)
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message=f"Tokens created successfully: {user_name}").save()
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message=f"Tokens created successfully: {user_name}",
+            ).save()
 
-            response = TokenResponse(success=True, status_code=200, message="Tokens created successfully",
-                                     access_token=access_token, refresh_token=refresh_token)
+            response = TokenResponse(
+                success=True,
+                status_code=200,
+                message="Tokens created successfully",
+                access_token=access_token,
+                refresh_token=refresh_token,
+            )
         else:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
-                        message=f"Invalid credentials: {user_name}").save()
-            response = BasicResponse(success=False, status_code=401, message="Invalid credentials")
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_warning,
+                message=f"Invalid credentials: {user_name}",
+            ).save()
+            response = BasicResponse(
+                success=False, status_code=401, message="Invalid credentials"
+            )
     except Exception as e:
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
-                    message=f"Error: {e}").save()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=f"Error: {e}",
+        ).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()
 
 
 # Log Section
-@app.route('/log/addLogFrontEnd', methods=['POST'])
+@app.route("/log/addLogFrontEnd", methods=["POST"])
 @cross_origin()
 def upload_log_frontend() -> str:
     """
@@ -185,29 +271,35 @@ def upload_log_frontend() -> str:
     :return: A JSON object with a message and a status code.
     """
     # Get data from request body
-    log_type = request.json.get('log_type')
-    message = request.json.get('message')
+    log_type = request.json.get("log_type")
+    message = request.json.get("message")
 
-    response = LogActionsMongoDB(log_origin=LogOrigins.FRONTEND.value, log_type=log_type, message=message).insert_log()
+    response = LogActionsMongoDB(
+        log_origin=LogOrigins.FRONTEND.value,
+        log_type=log_type,
+        message=message,
+    ).insert_log()
     return response.model_dump_json()
 
 
-@app.route('/log/addLogBackEnd', methods=['POST'])
+@app.route("/log/addLogBackEnd", methods=["POST"])
 def upload_log_backend() -> str:
     """
     Endpoint to log data from the BackEnd
     :return: A JSON object with a message and a status code.
     """
     # Get data from request body
-    log_type = request.json.get('log_type')
-    message = request.json.get('message')
+    log_type = request.json.get("log_type")
+    message = request.json.get("message")
 
-    response = LogActionsMongoDB(log_origin=LogOrigins.BACKEND.value, log_type=log_type, message=message).insert_log()
+    response = LogActionsMongoDB(
+        log_origin=LogOrigins.BACKEND.value, log_type=log_type, message=message
+    ).insert_log()
     return response.model_dump_json()
 
 
 # Endpoint to retrieve logs by type
-@app.route('/log/getLogsBy', methods=['GET'])
+@app.route("/log/getLogsBy", methods=["GET"])
 @cross_origin()
 def get_logs_by() -> str:
     """
@@ -235,21 +327,32 @@ record_data = BasicRecordSessionData(patient_id="001-T-PAT", crd_id="001-T-CRD")
 
 
 # Render functions for the frontend
-@app.route('/render/getRecordData')
+@app.route("/render/getRecordData")
 @cross_origin()
 def get_record_session_data():
     try:
-        response = DataResponse(success=True, status_code=200, message="Data for Record-Session is ready",
-                                data=record_data.model_dump())
+        response = DataResponse(
+            success=True,
+            status_code=200,
+            message="Data for Record-Session is ready",
+            data=record_data.model_dump(),
+        )
     except ValueError as e:
-        response = DataResponse(success=False, status_code=400, message=f"Value Error: {e}", data={})
+        response = DataResponse(
+            success=False,
+            status_code=400,
+            message=f"Value Error: {e}",
+            data={},
+        )
     except Exception as e:
-        response = DataResponse(success=False, status_code=400, message=f"Error: {e}", data={})
+        response = DataResponse(
+            success=False, status_code=400, message=f"Error: {e}", data={}
+        )
 
     return response.model_dump()
 
 
-@app.route('/video', methods=['GET'])
+@app.route("/video", methods=["GET"])
 @cross_origin()
 def get_render_video():
     """
@@ -258,27 +361,38 @@ def get_render_video():
     """
     try:
         # Get data from request
-        record_data.crd_id = request.args.get('crd', "UNK")
-        record_data.patient_id = request.args.get('pid', "UNK")
+        record_data.crd_id = request.args.get("crd", "UNK")
+        record_data.patient_id = request.args.get("pid", "UNK")
         # Add a log
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                    message=f"Video requested: {record_data.crd_id}--{record_data.patient_id}").save()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_info,
+            message=f"Video requested: {record_data.crd_id}--{record_data.patient_id}",
+        ).save()
     except Exception as e:
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=str(e),
+        ).save()
     return redirect(f"https://{react_app.host}:{react_app.port}/")
 
 
 # Data Handler Section
-upload_files = os.path.join(os.getcwd(), 'uploads')
-app.config['UPLOADED_DEFAULT_DEST'] = upload_files  # Change this to your desired upload directory
-app.config['UPLOADED_DEFAULT_URL'] = 'http://localhost:5000/uploads/'  # Change this to your server's URL
-app.config['UPLOADED_DEFAULT_ALLOW'] = set(ARCHIVES)
-app.config['UPLOADED_DEFAULT_DENY'] = set()
-uploads = UploadSet('default', extensions=('',))
+upload_files = os.path.join(os.getcwd(), "uploads")
+app.config[
+    "UPLOADED_DEFAULT_DEST"
+] = upload_files  # Change this to your desired upload directory
+app.config[
+    "UPLOADED_DEFAULT_URL"
+] = "http://localhost:5000/uploads/"  # Change this to your server's URL
+app.config["UPLOADED_DEFAULT_ALLOW"] = set(ARCHIVES)
+app.config["UPLOADED_DEFAULT_DENY"] = set()
+uploads = UploadSet("default", extensions=("",))
 configure_uploads(app, (uploads,))
 
 
-@app.route('/video/digicam/makeVideo', methods=['GET'])
+@app.route("/video/digicam/makeVideo", methods=["GET"])
 # @jwt_required()
 @cross_origin()
 def record_video(duration: float = 10) -> str:
@@ -292,14 +406,23 @@ def record_video(duration: float = 10) -> str:
         camera_response = camera.start_recording()
         time.sleep(duration)
         camera_response = camera.stop_recording()
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Video recorded").save()
+        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Video recorded", ).save()
+
+        # TODO: Read the video file from disk and send it to the MongoDB database
+
         return BasicResponse(success=True, status_code=200, message="Video recorded successfully").model_dump_json()
     except Exception as e:
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
-        return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=str(e),
+        ).save()
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
 
 
-@app.route('/video/digicam/startVideo', methods=['GET'])
+@app.route("/video/digicam/startVideo", methods=["GET"])
 # @jwt_required()
 @cross_origin()
 def digicam_start_video() -> str:
@@ -307,26 +430,45 @@ def digicam_start_video() -> str:
     Endpoint to start recording a video file using DigicamControl.
     @return: A BasicResponse with a message and a status code.
     """
-    logger.info(f"127.0.0.1 - - [{get_now_standard()}] \"GET /video/digicam/startVideo\"")
+    logger.info(f'127.0.0.1 - - [{get_now_standard()}] "GET /video/digicam/startVideo"')
     if not camera.is_running:
         camera.run_digicam()
     try:
         camera_response = camera.start_recording()
         if camera_response.success:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message="Video recording started").save()
-            return BasicResponse(success=True, status_code=200, message="Video recording started").model_dump_json()
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message="Video recording started",
+            ).save()
+            return BasicResponse(
+                success=True,
+                status_code=200,
+                message="Video recording started",
+            ).model_dump_json()
         else:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
-                        message="Video recording not started").save()
-            return BasicResponse(success=False, status_code=400,
-                                 message="Video recording not started").model_dump_json()
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_error,
+                message="Video recording not started",
+            ).save()
+            return BasicResponse(
+                success=False,
+                status_code=400,
+                message="Video recording not started",
+            ).model_dump_json()
     except Exception as e:
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
-        return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=str(e),
+        ).save()
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
 
 
-@app.route('/video/digicam/stopVideo', methods=['GET'])
+@app.route("/video/digicam/stopVideo", methods=["POST"])
 # @jwt_required()
 @cross_origin()
 def digicam_stop_video() -> str:
@@ -334,24 +476,52 @@ def digicam_stop_video() -> str:
     Endpoint to stop recording a video file using DigicamControl.
     @return: A BasicResponse with a message and a status code.
     """
-    logger.info(f"{request.remote_addr} - - [{get_now_standard()}] \"GET /video/digicam/stopVideo\"")
+    logger.info(
+        f'{request.remote_addr} - - [{get_now_standard()}] "GET /video/digicam/stopVideo"'
+    )
+
     try:
-        camera_response = camera.stop_recording()
-        if camera_response.success:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message="Video recording stopped").save()
-            return BasicResponse(success=True, status_code=200, message="Video recording stopped").model_dump_json()
-        else:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
-                        message="Video recording not stopped").save()
-            return BasicResponse(success=False, status_code=400,
-                                 message="Video recording not stopped").model_dump_json()
+        crd_id = request.json.get("crdId", "UNK")
     except Exception as e:
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
         return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
 
 
-@app.route('/video/uploads', methods=['POST'])
+    try:
+        camera_response = camera.stop_recording()
+        if camera_response.success:
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message="Video recording stopped",
+            ).save()
+            return BasicResponse(
+                success=True,
+                status_code=200,
+                message="Video recording stopped",
+            ).model_dump_json()
+        else:
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_error,
+                message="Video recording not stopped",
+            ).save()
+            return BasicResponse(
+                success=False,
+                status_code=400,
+                message="Video recording not stopped",
+            ).model_dump_json()
+    except Exception as e:
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=str(e),
+        ).save()
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
+
+
+@app.route("/video/uploads", methods=["POST"])
 @jwt_required()
 @cross_origin()
 def upload_video(save_test: bool = True) -> str:
@@ -359,53 +529,73 @@ def upload_video(save_test: bool = True) -> str:
     Endpoint to upload a video file to the server.
     :return: A BasicResponse with a message and a status code.
     """
-    logger.info(f"127.0.0.1 - - [{get_now_standard()}] \"POST /video/uploads\"")
+    logger.info(f'127.0.0.1 - - [{get_now_standard()}] "POST /video/uploads"')
     try:
         # Get the video file from the request
-        video = request.files.get('video')
+        video = request.files.get("video")
 
         video_buffer = video.stream.read()
         video_encrypted = security_config.encryptor_backend.encrypt_object(video_buffer)
 
         # Get the data from the request body
-        crd_id = request.form.get('crd_id', "UNK")
-        patient_id = request.form.get('patient_id', "UNK")
-        file_name = request.form.get('file_name', f"{crd_id}--{patient_id}--{get_now_standard()}.mkv")
+        crd_id = request.form.get("crd_id", "UNK")
+        patient_id = request.form.get("patient_id", "UNK")
+        file_name = request.form.get(
+            "file_name", f"{crd_id}--{patient_id}--{get_now_standard()}.mkv"
+        )
 
         # Log the data from the request
-        logger.info(f"FrontEnd: Data send - CRD: {crd_id} - Patient: {patient_id} - File: {file_name}")
+        logger.info(
+            f"FrontEnd: Data send - CRD: {crd_id} - Patient: {patient_id} - File: {file_name}"
+        )
 
         if save_test:
             # Save the video file as a new file
             os.makedirs(upload_files, exist_ok=True)
             path_video = os.path.join(upload_files, file_name)
-            with open(path_video, 'wb') as f:
+            with open(path_video, "wb") as f:
                 f.write(video_buffer)
-            logger.info(f"BackEnd: Video saved - CRD: {crd_id} - Patient: {patient_id} - File: {path_video}")
+            logger.info(
+                f"BackEnd: Video saved - CRD: {crd_id} - Patient: {patient_id} - File: {path_video}"
+            )
 
         # Create a VideoAction
-        video_act = VideoActionsMongoDB(crd_id=crd_id, patient_id=patient_id, filename=file_name)
+        video_act = VideoActionsMongoDB(
+            crd_id=crd_id, patient_id=patient_id, filename=file_name
+        )
         # Save the video path to MongoDB
         response = video_act.insert_video(video_encrypted)
 
         # Log the video upload
         if response.success:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message=f"Video uploaded: {file_name}").save()
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message=f"Video uploaded: {file_name}",
+            ).save()
         else:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error,
-                        message=f"Video not uploaded: {file_name}").save()
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_error,
+                message=f"Video not uploaded: {file_name}",
+            ).save()
 
     except Exception as e:
         # Add a log
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=str(e),
+        ).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
 
-    logger.info(f"127.0.0.1 - - [{get_now_standard()}] \"POST /video/uploads\" - {response.model_dump_json()}")
+    logger.info(
+        f'127.0.0.1 - - [{get_now_standard()}] "POST /video/uploads" - {response.model_dump_json()}'
+    )
     return response.model_dump_json()
 
 
-@app.route('/video/downloadBy', methods=['GET'])
+@app.route("/video/downloadBy", methods=["GET"])
 def download_video():
     """
     Endpoint to download a video file from the server.
@@ -428,25 +618,43 @@ def download_video():
 
                 file_mongo = obj_mongo.get("file")
                 video_encrypted = file_mongo.read()
-                video = security_config.encryptor_backend.decrypt_object(video_encrypted)
+                video = security_config.encryptor_backend.decrypt_object(
+                    video_encrypted
+                )
 
                 # Write the video file to a specified path
                 if not os.path.exists(upload_files):
                     os.makedirs(upload_files)
                 file_path = os.path.join(upload_files, video_name)
-                with open(file_path, 'wb') as f:
+                with open(file_path, "wb") as f:
                     f.write(video)
 
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message=f"Video/s downloaded successfully: {videos_found}").save()
-            response = ListResponse(success=True, status_code=200, message="Videos downloaded successfully",
-                                    data=videos_found)
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message=f"Video/s downloaded successfully: {videos_found}",
+            ).save()
+            response = ListResponse(
+                success=True,
+                status_code=200,
+                message="Videos downloaded successfully",
+                data=videos_found,
+            )
         else:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
-                        message=f"Video/s not found: {query}").save()
-            response = BasicResponse(success=False, status_code=400, message="Video/s not found")
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_warning,
+                message=f"Video/s not found: {query}",
+            ).save()
+            response = BasicResponse(
+                success=False, status_code=400, message="Video/s not found"
+            )
     except Exception as e:
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=str(e),
+        ).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
 
     return response.model_dump_json()
@@ -464,7 +672,7 @@ def protected():
 
 
 # Backup Section
-@app.route('/backup/make', methods=['GET'])
+@app.route("/backup/make", methods=["GET"])
 @cross_origin()
 def make_backup():
     """
@@ -473,15 +681,21 @@ def make_backup():
     """
     try:
         if backup.make_():
-            response = BasicResponse(success=True, status_code=200, message="Backup created successfully")
+            response = BasicResponse(
+                success=True,
+                status_code=200,
+                message="Backup created successfully",
+            )
         else:
-            response = BasicResponse(success=False, status_code=400, message="Backup not created")
+            response = BasicResponse(
+                success=False, status_code=400, message="Backup not created"
+            )
     except Exception as e:
         response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()
 
 
-@app.route('/backup/restore', methods=['GET'])
+@app.route("/backup/restore", methods=["GET"])
 @cross_origin()
 def restore_backup():
     """
@@ -489,20 +703,36 @@ def restore_backup():
     :return: A BasicResponse with a message and a status code.
     """
     try:
-        backup_date = request.args.get('date', '')
+        backup_date = request.args.get("date", "")
         if backup.restore(backup_date):
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info,
-                        message=f"Backup restored successfully: {backup_date}").save()
-            response = BasicResponse(success=True, status_code=200, message="Backup restored successfully")
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_info,
+                message=f"Backup restored successfully: {backup_date}",
+            ).save()
+            response = BasicResponse(
+                success=True,
+                status_code=200,
+                message="Backup restored successfully",
+            )
         else:
-            LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_warning,
-                        message=f"Backup not restored: {backup_date}").save()
-            response = BasicResponse(success=False, status_code=400, message="Backup not restored")
+            LogDocument(
+                log_origin=LogOrigins.BACKEND.value,
+                log_type=log_type_warning,
+                message=f"Backup not restored: {backup_date}",
+            ).save()
+            response = BasicResponse(
+                success=False, status_code=400, message="Backup not restored"
+            )
     except Exception as e:
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_error, message=str(e)).save()
+        LogDocument(
+            log_origin=LogOrigins.BACKEND.value,
+            log_type=log_type_error,
+            message=str(e),
+        ).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run()
