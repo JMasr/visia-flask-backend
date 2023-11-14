@@ -1,6 +1,8 @@
+import base64
 import os
 import time
 
+import cv2
 from flask import Flask, request, redirect, send_from_directory
 from flask_cors import CORS, cross_origin
 from flask_jwt_extended import (
@@ -35,8 +37,9 @@ from responses.basic_responses import (
     ListResponse,
     TokenResponse,
 )
-from utils.backup import BackUp
 from utils.utils import get_now_standard
+from utils.backup import BackUp
+from utils.files import check_for_new_files, get_last_created_file
 
 # Initialize Flask
 app = Flask(__name__)
@@ -220,7 +223,7 @@ def get_access_token_by_user():
         front_user = UserDocument.objects(username=user_name).first()
 
         if user_pass == security_config.encryptor_backend.decrypt_object(
-                front_user.password
+            front_user.password
         ):
             LogDocument(
                 log_origin=LogOrigins.BACKEND.value,
@@ -379,10 +382,10 @@ def get_render_video():
 
 
 # Data Handler Section
-upload_files = os.path.join(os.getcwd(), "uploads")
+upload_folder = os.path.join(os.getcwd(), "uploads")
 app.config[
     "UPLOADED_DEFAULT_DEST"
-] = upload_files  # Change this to your desired upload directory
+] = upload_folder  # Change this to your desired upload directory
 app.config[
     "UPLOADED_DEFAULT_URL"
 ] = "http://localhost:5000/uploads/"  # Change this to your server's URL
@@ -400,23 +403,30 @@ def record_video(duration: float = 10) -> str:
     Endpoint to record a video file using DigicamControl.
     @param duration: The duration of the video in seconds.
     """
+    logger.info(f'{request.remote_addr} - "GET /video/digicam/makeVideo" -')
     if not camera.is_running:
+        logger.warning(
+            f'{request.remote_addr} - "GET /video/digicam/makeVideo" - digicam isnt running'
+        )
         camera.run_digicam()
     try:
         camera_response = camera.start_recording()
-        time.sleep(duration)
-        camera_response = camera.stop_recording()
-        LogDocument(log_origin=LogOrigins.BACKEND.value, log_type=log_type_info, message="Video recorded", ).save()
+        if camera_response.success:
+            time.sleep(duration)
+            camera_response = camera.stop_recording()
 
-        # TODO: Read the video file from disk and send it to the MongoDB database
-
-        return BasicResponse(success=True, status_code=200, message="Video recorded successfully").model_dump_json()
+            if camera_response.success:
+                # TODO: send video to FrontEnd
+                return BasicResponse(
+                    success=True, status_code=200, message="Video recorded successfully"
+                ).model_dump_json()
+        return BasicResponse(
+            success=False, status_code=500, message="Video recording fail"
+        ).model_dump_json()
     except Exception as e:
-        LogDocument(
-            log_origin=LogOrigins.BACKEND.value,
-            log_type=log_type_error,
-            message=str(e),
-        ).save()
+        logger.error(
+            f'{request.remote_addr} - "GET /video/digicam/makeVideo" - Error {e}'
+        )
         return BasicResponse(
             success=False, status_code=500, message=str(e)
         ).model_dump_json()
@@ -430,39 +440,36 @@ def digicam_start_video() -> str:
     Endpoint to start recording a video file using DigicamControl.
     @return: A BasicResponse with a message and a status code.
     """
-    logger.info(f'127.0.0.1 - - [{get_now_standard()}] "GET /video/digicam/startVideo"')
+    logger.info(f'{request.remote_addr} - "GET /video/digicam/startVideo"')
     if not camera.is_running:
+        logger.warning(
+            f'{request.remote_addr} - "GET /video/digicam/startVideo" - digiCam isnt running'
+        )
         camera.run_digicam()
     try:
         camera_response = camera.start_recording()
         if camera_response.success:
-            LogDocument(
-                log_origin=LogOrigins.BACKEND.value,
-                log_type=log_type_info,
-                message="Video recording started",
-            ).save()
+            logger.info(
+                f'{request.remote_addr} - "GET /video/digicam/startVideo" - 200 - digiCam start the recording'
+            )
             return BasicResponse(
                 success=True,
                 status_code=200,
                 message="Video recording started",
             ).model_dump_json()
         else:
-            LogDocument(
-                log_origin=LogOrigins.BACKEND.value,
-                log_type=log_type_error,
-                message="Video recording not started",
-            ).save()
+            logger.error(
+                f'{request.remote_addr} - "GET /video/digicam/startVideo" - 500 - digiCam failed to start recording'
+            )
             return BasicResponse(
                 success=False,
                 status_code=400,
                 message="Video recording not started",
             ).model_dump_json()
     except Exception as e:
-        LogDocument(
-            log_origin=LogOrigins.BACKEND.value,
-            log_type=log_type_error,
-            message=str(e),
-        ).save()
+        logger.error(
+            f'{request.remote_addr} - "GET /video/digicam/startVideo" - 500 - Error: {e}'
+        )
         return BasicResponse(
             success=False, status_code=500, message=str(e)
         ).model_dump_json()
@@ -471,46 +478,106 @@ def digicam_start_video() -> str:
 @app.route("/video/digicam/stopVideo", methods=["POST"])
 # @jwt_required()
 @cross_origin()
-def digicam_stop_video() -> str:
+def digicam_stop_video(waiting_time: int = 15, video_format: str = "mp4") -> str:
     """
     Endpoint to stop recording a video file using DigicamControl.
     @return: A BasicResponse with a message and a status code.
     """
-    logger.info(
-        f'{request.remote_addr} - - [{get_now_standard()}] "GET /video/digicam/stopVideo"'
-    )
+    logger.info(f'{request.remote_addr} - "POST /video/digicam/stopVideo"')
 
+    # Check request body
     try:
-        crd_id = request.json.get("crdId", "UNK")
+        crd_id: str = request.json.get("crdId", "UNK")
+        if crd_id == "UNK":
+            logger.warning(
+                f"{request.remote_addr} - POST /video/digicam/stopVideo - CRD_ID missed!!"
+            )
+        else:
+            logger.info(
+                f"{request.remote_addr} - POST /video/digicam/stopVideo - CRD_ID: {crd_id}"
+            )
     except Exception as e:
-        return BasicResponse(success=False, status_code=500, message=str(e)).model_dump_json()
+        logger.error(
+            f"{request.remote_addr} - POST /video/digicam/stopVideo - Error: {e}"
+        )
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
 
+    # Stop recording
+    upload_files: list = os.listdir()
+    recording_r: BasicResponse = camera.stop_recording()
+    if not recording_r.success:
+        logger.warning(
+            f"{request.remote_addr} - POST /video/digicam/stopVideo -  Error: digiCam cant stop the recording"
+        )
+        return recording_r.model_dump_json()
+
+    # Way for the video transferring
+    is_new_file: bool = check_for_new_files(
+        path_folder=upload_folder,
+        previous_files=upload_files,
+        timer_seconds=waiting_time,
+    )
+    if not is_new_file:
+        logger.warning(
+            f"{request.remote_addr} - POST /video/digicam/stopVideo - New video not found at {upload_folder}"
+        )
+        return BasicResponse(
+            success=False, status_code=500, message="Recording fail!"
+        ).model_dump_json()
 
     try:
-        camera_response = camera.stop_recording()
-        if camera_response.success:
+        logger.info(
+            f"{request.remote_addr} - POST /video/digicam/stopVideo - Video recorded at {upload_folder}"
+        )
+        # Read the file and erase from disk
+        video_path: str = get_last_created_file(upload_folder)
+        with open(video_path, "br") as f:
+            new_video = f.read()
+
+        os.remove(video_path)
+
+        # Encrypt the file
+        video_encrypted = security_config.encryptor_backend.encrypt_object(new_video)
+
+        # Save in MongoDB
+        file_name = f"{crd_id}_{get_now_standard()}.{video_format}"
+        video_act = VideoActionsMongoDB(crd_id=crd_id, filename=file_name)
+        response = video_act.insert_video(video_encrypted)
+
+        # Log the video upload
+        if response.success:
+            logger.info(
+                f"{request.remote_addr} - POST /video/digicam/stopVideo - 200 - Video recorded and upload"
+            )
             LogDocument(
                 log_origin=LogOrigins.BACKEND.value,
                 log_type=log_type_info,
-                message="Video recording stopped",
+                message=f"Video recorded and upload: {file_name}",
             ).save()
             return BasicResponse(
-                success=True,
-                status_code=200,
-                message="Video recording stopped",
+                success=True, status_code=200, message="Video recorded & Saved"
             ).model_dump_json()
         else:
+            logger.error(
+                f"{request.remote_addr} - POST /video/digicam/stopVideo - 501 - Video Recorded but not uploaded"
+            )
             LogDocument(
                 log_origin=LogOrigins.BACKEND.value,
                 log_type=log_type_error,
-                message="Video recording not stopped",
+                message=f"Video Recorded but not uploaded: {file_name}",
             ).save()
             return BasicResponse(
-                success=False,
-                status_code=400,
-                message="Video recording not stopped",
+                success=True,
+                status_code=501,
+                message="Video recorded but not uploaded.",
             ).model_dump_json()
-    except Exception as e:
+    except Exception or ConnectionError as e:
+        # Add a log
+        logger.error(
+            f"{request.remote_addr} - POST /video/digicam/stopVideo - 500 - Error: Upload fail because {e}"
+        )
         LogDocument(
             log_origin=LogOrigins.BACKEND.value,
             log_type=log_type_error,
@@ -519,6 +586,65 @@ def digicam_stop_video() -> str:
         return BasicResponse(
             success=False, status_code=500, message=str(e)
         ).model_dump_json()
+
+
+@app.route("/video/digicam/preview", methods=["GET"])
+# @jwt_required()
+@cross_origin()
+def digicam_preview():
+    """
+    Use digicam to record a video and take one frame as a visualization of the camera
+    """
+
+
+def send_video_frame_as_json(video_path: str, frame_number: int = 0) -> str:
+    """
+    Extract a frame from an MP4 video and send it to the frontend as a JSON response.
+    @param: video_path: Path to the MP4 video file
+    @param: frame_number: Frame number to extract (default is the first frame)
+    @return: JSON response containing the frame data
+    """
+    cap = None
+    try:
+        # Open the video file
+        cap = cv2.VideoCapture(video_path)
+
+        # Set the frame position
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+
+        # Read the frame
+        ret, frame = cap.read()
+
+        # Check if the frame is successfully read
+        if not ret:
+            return BasicResponse(
+                success=False, status_code=501, message="Error reading frame from video"
+            ).model_dump_json()
+
+        # Convert the frame to base64 for sending in JSON
+        _, buffer = cv2.imencode(".jpg", frame)
+        frame_base64 = base64.b64encode(buffer).decode("utf-8")
+
+        frame_response = {"frame_number": frame_number, "frame_base64": frame_base64}
+        frame_data_response = DataResponse(
+            success=True,
+            status_code=200,
+            message="Frame for preview",
+            data=frame_response,
+        )
+        return frame_data_response.model_dump_json()
+
+    except (Exception, ConnectionError, IOError) as e:
+        return BasicResponse(
+            sucess=False,
+            status_code=500,
+            message=f"Error sending frame for previsualitation: {e}",
+        ).model_dump_json()
+
+    finally:
+        # Release the video capture object
+        if cap:
+            cap.release()
 
 
 @app.route("/video/uploads", methods=["POST"])
@@ -551,8 +677,8 @@ def upload_video(save_test: bool = True) -> str:
 
         if save_test:
             # Save the video file as a new file
-            os.makedirs(upload_files, exist_ok=True)
-            path_video = os.path.join(upload_files, file_name)
+            os.makedirs(upload_folder, exist_ok=True)
+            path_video = os.path.join(upload_folder, file_name)
             with open(path_video, "wb") as f:
                 f.write(video_buffer)
             logger.info(
@@ -623,9 +749,9 @@ def download_video():
                 )
 
                 # Write the video file to a specified path
-                if not os.path.exists(upload_files):
-                    os.makedirs(upload_files)
-                file_path = os.path.join(upload_files, video_name)
+                if not os.path.exists(upload_folder):
+                    os.makedirs(upload_folder)
+                file_path = os.path.join(upload_folder, video_name)
                 with open(file_path, "wb") as f:
                     f.write(video)
 
