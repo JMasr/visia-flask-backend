@@ -5,6 +5,7 @@ import subprocess
 
 from config.backend_config import BasicCameraConfig, logger
 from responses.basic_responses import BasicResponse, DataResponse
+from utils.files import check_for_new_files
 
 
 class Camera:
@@ -177,7 +178,7 @@ class Camera:
             cmd = [
                 os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
                 "/c",
-                self.captureCommand,
+                self.capture_command,
                 location,
             ]
             response = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
@@ -221,16 +222,26 @@ class Camera:
         :param duration: Duration of the video in seconds. Default = 420
         :return: a DataResponse indicating the success of the operation with a message and the path of the video.
         """
-        self.show_live_view()
-        self.run_cmd("do StartRecord")
-        time.sleep(duration)
-        self.run_cmd("do StopRecord")
-        self.run_cmd("do LiveViewWnd_Hide")
-        return BasicResponse(
-            success=True,
-            status_code=200,
-            message=f"Camera: Video capture - Location: {location}",
-        )
+        try:
+            self.show_live_view()
+            self.run_cmd("do StartRecord")
+            time.sleep(duration)
+            self.run_cmd("do StopRecord")
+            self.run_cmd("do LiveViewWnd_Hide")
+
+            if check_for_new_files(location):
+                logger.info("Camera: Video recorded successfully")
+                return DataResponse(
+                    success=True,
+                    status_code=200,
+                    message=f"Video capture successfully",
+                    data={"path": location},
+                )
+        except (Exception, IOError) as e:
+            logger.error(f"Camera: Video recording fail: {e}")
+            return BasicResponse(
+                sucess=True, status_code=200, message=f"Video recording fail: {e}"
+            )
 
     def start_recording(self) -> BasicResponse:
         """
@@ -298,7 +309,7 @@ class Camera:
                 message=f"Camera: Recording failed - Error: {e}",
             )
 
-    def stop_recording(self):
+    def stop_recording(self) -> BasicResponse:
         """
         Stop recording a video - filename and location can be specified in string location, otherwise the default will
         be used.
@@ -323,7 +334,7 @@ class Camera:
                     "do",
                     "LiveViewWnd_Hide",
                 ]
-                response = subprocess.run(cmd, capture_output=True)
+                subprocess.run(cmd, capture_output=True)
                 return BasicResponse(
                     success=True,
                     status_code=200,
@@ -397,10 +408,10 @@ class Camera:
         :return:
         """
         if status:
-            self.captureCommand = "Capture"
+            self.capture_command = "Capture"
             print("Autofocus is on.")
         else:
-            self.captureCommand = "CaptureNoAf"
+            self.capture_command = "CaptureNoAf"
             print("Autofocus is off.")
 
     # %% Shutters-peed

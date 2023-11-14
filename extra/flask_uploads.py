@@ -281,7 +281,7 @@ class UploadConfiguration(object):
 
     @property
     def tuple(self):
-        return (self.destination, self.base_url, self.allow, self.deny)
+        return self.destination, self.base_url, self.allow, self.deny
 
     def __eq__(self, other):
         return self.tuple == other.tuple
