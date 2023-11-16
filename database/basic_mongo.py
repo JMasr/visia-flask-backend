@@ -32,7 +32,6 @@ class LogDocument(Document):
 class VideoDocument(Document):
     # Metadata
     crd_id = StringField(required=True)
-    patient_id = StringField(required=True)
     timestamp = DateTimeField(default=datetime.now())
     # Video
     filename = StringField(required=True)
@@ -157,13 +156,11 @@ class VideoActionsMongoDB(BaseModel):
     """
     Class to perform actions with Videos on the MongoDB database.
     :param crd_id: Receive the CRD ID of the video.
-    :param patient_id: Receive the Patient ID of the video.
     :param filename: Receive the filename of the video.
     """
 
     # Metadata
     crd_id: str
-    patient_id: str
     # Video
     filename: str
 
@@ -177,7 +174,6 @@ class VideoActionsMongoDB(BaseModel):
                 # Create a Video Document
                 new_video = VideoDocument(
                     crd_id=self.crd_id,
-                    patient_id=self.patient_id,
                     filename=self.filename,
                     _file=file,
                 )
@@ -186,11 +182,7 @@ class VideoActionsMongoDB(BaseModel):
                 id_video = str(id_mongo_db.id)
 
                 # Check if the video has the correct parameters
-                if (
-                    self.crd_id == "UNK"
-                    or self.patient_id == "UNK"
-                    or "UNK" in self.filename
-                ):
+                if self.crd_id == "UNK" or "UNK" in self.filename:
                     # Handle the case where the video has missing parameters
                     response = DataResponse(
                         success=True,
@@ -226,7 +218,7 @@ class VideoActionsMongoDB(BaseModel):
     def get_videos_by(query: dict[str, str]) -> BasicResponse:
         """
         Get videos from the MongoDB database based on specified filters.
-        :param query: A dictionary containing filter criteria, e.g., {'patient_id': '123456789'}
+        :param query: A dictionary containing filter criteria, e.g., {'crd_id': '123456789'}
         :return: A JSON object with a message and a status code.
         """
         try:
@@ -236,7 +228,6 @@ class VideoActionsMongoDB(BaseModel):
                 {
                     "id": str(video.id),
                     "crd_id": video.crd_id,
-                    "patient_id": video.patient_id,
                     "filename": video.filename,
                     "file": video.get_video(),
                 }
