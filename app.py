@@ -39,7 +39,7 @@ from responses.basic_responses import (
 )
 from utils.utils import get_now_standard
 from utils.backup import BackUp
-from utils.files import check_for_new_files, get_last_created_file
+from utils.files import check_for_new_files, get_last_created_file, get_video_properties
 
 # Initialize Flask
 app = Flask(__name__)
@@ -478,7 +478,7 @@ def digicam_start_video() -> str:
 @app.route("/video/digicam/stopVideo", methods=["POST"])
 # @jwt_required()
 @cross_origin()
-def digicam_stop_video(waiting_time: int = 15, video_format: str = "mp4") -> str:
+def digicam_stop_video(waiting_time: int = 30, video_format: str = "mp4") -> str:
     """
     Endpoint to stop recording a video file using DigicamControl.
     @return: A BasicResponse with a message and a status code.
@@ -505,7 +505,7 @@ def digicam_stop_video(waiting_time: int = 15, video_format: str = "mp4") -> str
         ).model_dump_json()
 
     # Stop recording
-    upload_files: list = os.listdir()
+    upload_files: list = os.listdir(upload_folder)
     recording_r: BasicResponse = camera.stop_recording()
     if not recording_r.success:
         logger.warning(
@@ -532,7 +532,9 @@ def digicam_stop_video(waiting_time: int = 15, video_format: str = "mp4") -> str
             f"{request.remote_addr} - POST /video/digicam/stopVideo - Video recorded at {upload_folder}"
         )
         # Read the file and erase from disk
-        video_path: str = get_last_created_file(upload_folder)
+        video_path: str = os.path.join(
+            upload_folder, get_last_created_file(upload_folder)
+        )
         with open(video_path, "br") as f:
             new_video = f.read()
 
@@ -751,9 +753,12 @@ def download_video():
                 # Write the video file to a specified path
                 if not os.path.exists(upload_folder):
                     os.makedirs(upload_folder)
-                file_path = os.path.join(upload_folder, video_name)
-                with open(file_path, "wb") as f:
+                video_path = os.path.join(upload_folder, video_name)
+                with open(video_path, "wb") as f:
                     f.write(video)
+
+                # Get the properties of the video downloaded
+                get_video_properties(video_path)
 
             LogDocument(
                 log_origin=LogOrigins.BACKEND.value,
