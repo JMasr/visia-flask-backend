@@ -2,6 +2,8 @@ import os
 import time
 from typing import List, Optional
 
+import cv2
+
 from config.backend_config import logger
 
 
@@ -42,7 +44,7 @@ def check_for_new_files(
             break
 
         # Wait for a short interval before checking again
-        time.sleep(1)
+        time.sleep(10)
 
     return False
 
@@ -72,3 +74,57 @@ def get_last_created_file(path_folder: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"127.0.0.1 - util.get_last_created_file - Error: {e}")
         return None
+
+
+def get_video_properties(video_path: str) -> dict:
+    """
+    Get the properties of a video file.
+    @param video_path: Path to the video file
+    """
+    video_properties = {}
+    try:
+        # Open the video file
+        cap = cv2.VideoCapture(video_path)
+
+        if not cap.isOpened():
+            print("Error: Could not open video file.")
+            return video_properties
+
+        # Get video properties
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        codec = int(cap.get(cv2.CAP_PROP_FOURCC))
+        # Release the video file
+        cap.release()
+
+        # Convert codec to four-character code
+        codec_fourcc = (
+            chr(codec & 0xFF)
+            + chr((codec >> 8) & 0xFF)
+            + chr((codec >> 16) & 0xFF)
+            + chr((codec >> 24) & 0xFF)
+        )
+
+        # Store video properties in a dictionary
+        video_properties = {
+            "fps": fps,
+            "frame_count": frame_count,
+            "width": width,
+            "height": height,
+            "codec_fourcc": codec_fourcc,
+        }
+
+        # Log video properties
+        logger.info(
+            "Video - Properties - OK -"
+            f" FPS: {fps} "
+            f" Frame Count: {frame_count}"
+            f" Resolution: {width}x{height}"
+            f" Codec: {codec_fourcc}"
+        )
+        return video_properties
+    except Exception as e:
+        logger.error(f"Video - Properties - Error - Fails to get video properties: {e}")
+        return video_properties
