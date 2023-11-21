@@ -3,6 +3,7 @@ import time
 from typing import List, Optional
 
 import cv2
+from pydantic import BaseModel
 
 from config.backend_config import logger
 
@@ -128,3 +129,59 @@ def get_video_properties(video_path: str) -> dict:
     except Exception as e:
         logger.error(f"Video - Properties - Error - Fails to get video properties: {e}")
         return video_properties
+
+
+class BasicFileConfig(BaseModel):
+    uploads_path: str = os.path.join(os.getcwd(), "uploads")
+    backups_path: str = os.path.join(os.getcwd(), "backups")
+    if not os.path.exists(uploads_path):
+        os.makedirs(uploads_path)
+
+    upload_files: list = os.listdir(uploads_path)
+
+    def update_upload_files(self):
+        """
+        Update the list of files in the uploads folder.
+        """
+        self.upload_files = os.listdir(self.uploads_path)
+
+    def get_last_created(self):
+        """
+        Get the path to last created file in the upload folder.
+        """
+        return os.path.join(self.uploads_path, get_last_created_file(self.uploads_path))
+
+    def exists(self, file_name: str = None) -> bool:
+        """
+        Check if a file exists in the upload folder. If the file_name is None, it checks if the uploads folder is empty.
+        """
+        if file_name is None:
+            file_name = self.uploads_path
+        else:
+            file_name = os.path.join(self.uploads_path, file_name)
+        return os.path.exists(file_name)
+
+    def check_for_new_files(self, waiting_time: int = 60 * 15):
+        """
+        Check if there is any new file in the upload folder during a specific time.
+        @param: waiting_time: Max seconds of the waiting time
+        @return: True if there is a new file before the timer reaches 0, otherwise False
+        """
+        are_new_files = check_for_new_files(
+            self.uploads_path, timer_seconds=waiting_time
+        )
+        self.update_upload_files()
+        return are_new_files
+
+    def delete_all_files(self) -> bool:
+        """
+        Delete all files in the uploads folder.
+        """
+        try:
+            for file in os.listdir(self.uploads_path):
+                os.remove(os.path.join(self.uploads_path, file))
+            self.update_upload_files()
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting files: {e}")
+            return False
