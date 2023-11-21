@@ -68,6 +68,12 @@ class Camera:
             logger.error(f"digiCamControl: @{self.exeDir} - Status: {e}")
             return False
 
+    def is_connected(self) -> bool:
+        """
+        Check if the camera is connected using the OpenCv library.
+        """
+        # TODO: Implement this method
+
     def run_digicam(self) -> BasicResponse:
         """
         Run the digiCamControl program.
