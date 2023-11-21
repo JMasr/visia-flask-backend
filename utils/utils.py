@@ -1,4 +1,5 @@
 import os
+import json
 import pickle
 from datetime import datetime
 
@@ -41,3 +42,20 @@ def load_obj(path_2_pkl: str) -> object:
     except Exception or IOError as e:
         print(f"Error loading object: {e}")
         return None
+
+
+def save_config_as_json(config: dict, path: str) -> bool:
+    """
+    Save a dictionary as a json file. Useful to save the configuration of the experiments
+    :param config: dictionary with the configuration
+    :param path: path to save the json file
+    :return: True if the file was saved successfully, False otherwise
+    """
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=4)
+            return True
+    except Exception or IOError as e:
+        print(f"Error saving object: {e}")
+        return False
