@@ -325,7 +325,7 @@ def get_logs_by() -> str:
 
 
 # Render section
-record_data = BasicRecordSessionData(patient_id="001-T-PAT", crd_id="001-T-CRD")
+record_data = BasicRecordSessionData(crd_id="001-T-CRD", ov=1)
 
 
 # Render functions for the frontend
@@ -364,12 +364,12 @@ def get_render_video():
     try:
         # Get data from request
         record_data.crd_id = request.args.get("crd", "UNK")
-        record_data.patient_id = request.args.get("pid", "UNK")
+        record_data.ov = request.args.get("ov", "UNK")
         # Add a log
         LogDocument(
             log_origin=LogOrigins.BACKEND.value,
             log_type=log_type_info,
-            message=f"Video requested: {record_data.crd_id}--{record_data.patient_id}",
+            message=f"Video requested: {record_data.crd_id}--{record_data.ov}",
         ).save()
     except Exception as e:
         LogDocument(
@@ -377,7 +377,7 @@ def get_render_video():
             log_type=log_type_error,
             message=str(e),
         ).save()
-    return redirect(f"https://{react_app.host}:{react_app.port}/")
+    return redirect(f"{react_app.host}:{react_app.port}/")
 
 
 # Data Handler Section
