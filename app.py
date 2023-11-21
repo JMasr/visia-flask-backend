@@ -12,7 +12,6 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from flask_mongoengine import MongoEngine
-from flask_uploads import UploadSet, configure_uploads, ARCHIVES
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 
@@ -37,9 +36,9 @@ from responses.basic_responses import (
     ListResponse,
     TokenResponse,
 )
-from utils.utils import get_now_standard
 from utils.backup import BackUp
-from utils.files import check_for_new_files, get_last_created_file, get_video_properties
+from utils.files import check_for_new_files, get_video_properties, BasicFileConfig
+from utils.utils import get_now_standard
 
 # Initialize Flask
 app = Flask(__name__)
@@ -382,17 +381,8 @@ def get_render_video():
 
 
 # Data Handler Section
-upload_folder = os.path.join(os.getcwd(), "uploads")
-app.config[
-    "UPLOADED_DEFAULT_DEST"
-] = upload_folder  # Change this to your desired upload directory
-app.config[
-    "UPLOADED_DEFAULT_URL"
-] = "http://localhost:5000/uploads/"  # Change this to your server's URL
-app.config["UPLOADED_DEFAULT_ALLOW"] = set(ARCHIVES)
-app.config["UPLOADED_DEFAULT_DENY"] = set()
-uploads = UploadSet("default", extensions=("",))
-configure_uploads(app, (uploads,))
+file_config = BasicFileConfig()
+file_config.update_upload_files()
 
 
 @app.route("/video/digicam/makeVideo", methods=["GET"])
@@ -404,7 +394,7 @@ def record_video(duration: float = 10) -> str:
     @param duration: The duration of the video in seconds.
     """
     logger.info(f'{request.remote_addr} - "GET /video/digicam/makeVideo" -')
-    if not camera.is_running:
+    if not camera.is_running():
         logger.warning(
             f'{request.remote_addr} - "GET /video/digicam/makeVideo" - digicam isnt running'
         )
@@ -441,7 +431,7 @@ def digicam_start_video() -> str:
     @return: A BasicResponse with a message and a status code.
     """
     logger.info(f'{request.remote_addr} - "GET /video/digicam/startVideo"')
-    if not camera.is_running:
+    if not camera.is_running():
         logger.warning(
             f'{request.remote_addr} - "GET /video/digicam/startVideo" - digiCam isnt running'
         )
@@ -475,16 +465,58 @@ def digicam_start_video() -> str:
         ).model_dump_json()
 
 
-@app.route("/video/digicam/stopVideo", methods=["POST"])
+@app.route("/video/digicam/stopVideo", methods=["GET"])
 # @jwt_required()
 @cross_origin()
-def digicam_stop_video(waiting_time: int = 30, video_format: str = "mp4") -> str:
+def digicam_stop_video() -> str:
     """
     Endpoint to stop recording a video file using DigicamControl.
     @return: A BasicResponse with a message and a status code.
     """
     logger.info(f'{request.remote_addr} - "POST /video/digicam/stopVideo"')
 
+    # Save the number of files before recording
+    file_config.update_upload_files()
+
+    # Stop the recording
+    recording_r: BasicResponse = camera.stop_recording()
+    # Log the response
+    if recording_r.success:
+        logger.info(f"{request.remote_addr} - POST /video/digicam/stopVideo - 200")
+    else:
+        logger.error(
+            f"{request.remote_addr} -POST /video/digicam/stopVideo - 500 - Error: {recording_r.message}"
+        )
+    return recording_r.model_dump_json()
+
+
+@app.route("/file/checkFile", methods=["GET"])
+# @jwt_required()
+@cross_origin()
+def check_new_file():
+    # Way for the file transferring/storage/etc
+    if not file_config.check_for_new_files():
+        logger.warning(
+            f"{request.remote_addr} - POST /files/checkFiles - WARNING - Nothing found on: {file_config.upload_files}"
+        )
+        return BasicResponse(
+            success=False, status_code=500, message="No new files found"
+        ).model_dump_json()
+
+    logger.info(
+        f"{request.remote_addr} - POST /files/checkFiles - OK - New file found: {file_config.get_last_created()}"
+    )
+    return BasicResponse(
+        success=True,
+        status_code=200,
+        message=f"New file found: {file_config.get_last_created()}",
+    ).model_dump_json()
+
+
+@app.route("/file/uploadLastCreated", methods=["POST"])
+# @jwt_required()
+@cross_origin()
+def save_new_file(video_format: str = "mp4") -> str:
     # Check request body
     try:
         crd_id: str = request.json.get("crdId", "UNK")
@@ -504,49 +536,33 @@ def digicam_stop_video(waiting_time: int = 30, video_format: str = "mp4") -> str
             success=False, status_code=500, message=str(e)
         ).model_dump_json()
 
-    # Stop recording
-    upload_files: list = os.listdir(upload_folder)
-    recording_r: BasicResponse = camera.stop_recording()
-    if not recording_r.success:
-        logger.warning(
-            f"{request.remote_addr} - POST /video/digicam/stopVideo -  Error: digiCam cant stop the recording"
-        )
-        return recording_r.model_dump_json()
-
-    # Way for the video transferring
-    is_new_file: bool = check_for_new_files(
-        path_folder=upload_folder,
-        previous_files=upload_files,
-        timer_seconds=waiting_time,
-    )
-    if not is_new_file:
-        logger.warning(
-            f"{request.remote_addr} - POST /video/digicam/stopVideo - New video not found at {upload_folder}"
-        )
-        return BasicResponse(
-            success=False, status_code=500, message="Recording fail!"
-        ).model_dump_json()
-
     try:
+        video_path: str = file_config.get_last_created()
         logger.info(
-            f"{request.remote_addr} - POST /video/digicam/stopVideo - Video recorded at {upload_folder}"
+            f"{request.remote_addr} - POST /files/checkFiles - OK - New file found: {video_path}"
         )
+
         # Read the file and erase from disk
-        video_path: str = os.path.join(
-            upload_folder, get_last_created_file(upload_folder)
-        )
         with open(video_path, "br") as f:
             new_video = f.read()
-
-        os.remove(video_path)
+        file_config.delete_all_files()
+        logger.info(
+            f"{request.remote_addr} - POST /files/checkFiles - OK - File read & erased: {video_path}"
+        )
 
         # Encrypt the file
         video_encrypted = security_config.encryptor_backend.encrypt_object(new_video)
+        logger.info(
+            f"{request.remote_addr} - POST /files/checkFiles - OK - File encrypted"
+        )
 
         # Save in MongoDB
         file_name = f"{crd_id}_{get_now_standard()}.{video_format}"
         video_act = VideoActionsMongoDB(crd_id=crd_id, filename=file_name)
         response = video_act.insert_video(video_encrypted)
+        logger.info(
+            f"{request.remote_addr} - POST /files/checkFiles - OK - File saved in MongoDB: {file_name}"
+        )
 
         # Log the video upload
         if response.success:
@@ -597,9 +613,45 @@ def digicam_preview():
     """
     Use digicam to record a video and take one frame as a visualization of the camera
     """
+    try:
+        logger.info(f'{request.remote_addr} - "GET /video/digicam/preview"')
+        if not camera.is_running():
+            logger.warning(
+                f'{request.remote_addr} - "GET /video/digicam/preview" - digicam isnt running'
+            )
+            camera.run_digicam()
+
+        camera_response = camera.start_recording()
+        if camera_response.success:
+            file_config.update_upload_files()
+            time.sleep(1.5)
+            camera_response = camera.stop_recording()
+
+            if camera_response.success:
+                # Way for the video transferring
+                if check_for_new_files(
+                    path_folder=file_config.uploads_path,
+                    previous_files=file_config.upload_files,
+                    timer_seconds=120,
+                ):
+                    video_path: str = file_config.get_last_created()
+                    response = send_video_frame_as_json(video_path)
+                    file_config.delete_all_files()
+                    return response.model_dump_json()
+
+        return BasicResponse(
+            success=False, status_code=501, message=camera_response.message
+        ).model_dump_json()
+    except Exception as e:
+        logger.error(
+            f'{request.remote_addr} - "GET /video/digicam/preview" - Error {e}'
+        )
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
 
 
-def send_video_frame_as_json(video_path: str, frame_number: int = 0) -> str:
+def send_video_frame_as_json(video_path: str, frame_number: int = 0) -> BasicResponse:
     """
     Extract a frame from an MP4 video and send it to the frontend as a JSON response.
     @param: video_path: Path to the MP4 video file
@@ -621,7 +673,7 @@ def send_video_frame_as_json(video_path: str, frame_number: int = 0) -> str:
         if not ret:
             return BasicResponse(
                 success=False, status_code=501, message="Error reading frame from video"
-            ).model_dump_json()
+            )
 
         # Convert the frame to base64 for sending in JSON
         _, buffer = cv2.imencode(".jpg", frame)
@@ -634,14 +686,14 @@ def send_video_frame_as_json(video_path: str, frame_number: int = 0) -> str:
             message="Frame for preview",
             data=frame_response,
         )
-        return frame_data_response.model_dump_json()
+        return frame_data_response
 
     except (Exception, ConnectionError, IOError) as e:
         return BasicResponse(
             sucess=False,
             status_code=500,
             message=f"Error sending frame for previsualitation: {e}",
-        ).model_dump_json()
+        )
 
     finally:
         # Release the video capture object
@@ -679,8 +731,8 @@ def upload_video(save_test: bool = True) -> str:
 
         if save_test:
             # Save the video file as a new file
-            os.makedirs(upload_folder, exist_ok=True)
-            path_video = os.path.join(upload_folder, file_name)
+            os.makedirs(file_config.uploads_path, exist_ok=True)
+            path_video = os.path.join(file_config.uploads_path, file_name)
             with open(path_video, "wb") as f:
                 f.write(video_buffer)
             logger.info(
@@ -751,9 +803,9 @@ def download_video():
                 )
 
                 # Write the video file to a specified path
-                if not os.path.exists(upload_folder):
-                    os.makedirs(upload_folder)
-                video_path = os.path.join(upload_folder, video_name)
+                if not file_config.exists():
+                    os.makedirs(file_config.uploads_path, exist_ok=True)
+                video_path = os.path.join(file_config.uploads_path, video_name)
                 with open(video_path, "wb") as f:
                     f.write(video)
 
