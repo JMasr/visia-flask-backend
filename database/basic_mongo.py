@@ -187,7 +187,7 @@ class VideoActionsMongoDB(BaseModel):
                     response = DataResponse(
                         success=True,
                         status_code=199,
-                        essage="Video uploaded, but missing parameters",
+                        message="Video uploaded, but missing parameters",
                         data={"id": id_video},
                     )
                 else:
