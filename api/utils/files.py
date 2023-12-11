@@ -5,7 +5,7 @@ from typing import List, Optional
 import cv2
 from pydantic import BaseModel
 
-from config.backend_config import logger
+from api.log import app_logger
 
 
 def check_for_new_files(
@@ -23,7 +23,7 @@ def check_for_new_files(
         previous_files = []
 
     if not (path_folder and os.path.exists(path_folder) and os.path.isdir(path_folder)):
-        logger.warning("127.0.0.1 - util.check_for_new_files - Invalid path folder")
+        app_logger.warning("127.0.0.1 - util.check_for_new_files - Invalid path folder")
         return False
 
     start_time = time.time()
@@ -34,14 +34,14 @@ def check_for_new_files(
         # Check if there are new files
         new_files = set(current_files) - set(previous_files)
         if new_files:
-            logger.info(
+            app_logger.info(
                 f"127.0.0.1 - util.check_for_new_files - New files detected: {new_files}"
             )
             return True
 
         # Check if the timer exceeds the limit
         if time.time() - start_time >= timer_seconds:
-            logger.info("127.0.0.1 - util.check_for_new_files - Timer limit reached")
+            app_logger.info("127.0.0.1 - util.check_for_new_files - Timer limit reached")
             break
 
         # Wait for a short interval before checking again
@@ -57,7 +57,7 @@ def get_last_created_file(path_folder: str) -> Optional[str]:
     @return: The last created file in the folder or None if the folder is empty
     """
     if not (path_folder and os.path.exists(path_folder) and os.path.isdir(path_folder)):
-        logger.warning("127.0.0.1 - util.get_last_created_file - Invalid path folder")
+        app_logger.warning("127.0.0.1 - util.get_last_created_file - Invalid path folder")
         return None
 
     try:
@@ -73,7 +73,7 @@ def get_last_created_file(path_folder: str) -> Optional[str]:
         # Return the name of the last created file
         return sorted_files[0][0] if sorted_files else None
     except Exception as e:
-        logger.error(f"127.0.0.1 - util.get_last_created_file - Error: {e}")
+        app_logger.error(f"127.0.0.1 - util.get_last_created_file - Error: {e}")
         return None
 
 
@@ -118,7 +118,7 @@ def get_video_properties(video_path: str) -> dict:
         }
 
         # Log video properties
-        logger.info(
+        app_logger.info(
             "Video - Properties - OK -"
             f" FPS: {fps} "
             f" Frame Count: {frame_count}"
@@ -127,7 +127,7 @@ def get_video_properties(video_path: str) -> dict:
         )
         return video_properties
     except Exception as e:
-        logger.error(f"Video - Properties - Error - Fails to get video properties: {e}")
+        app_logger.error(f"Video - Properties - Error - Fails to get video properties: {e}")
         return video_properties
 
 
@@ -183,5 +183,5 @@ class BasicFileConfig(BaseModel):
             self.update_upload_files()
             return True
         except Exception as e:
-            logger.error(f"Error deleting files: {e}")
+            app_logger.error(f"Error deleting files: {e}")
             return False

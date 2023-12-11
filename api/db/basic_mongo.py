@@ -9,8 +9,8 @@ from mongoengine import (
     FileField,
 )
 
-from log.basic_log_types import LogOrigins, LogTypes
-from responses.basic_responses import BasicResponse, DataResponse, ListResponse
+from api.log.basic_log_types import LogOrigins, LogTypes
+from api.responses.basic_responses import BasicResponse, DataResponse, ListResponse
 
 
 # MongoDB data models

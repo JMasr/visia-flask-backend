@@ -1,8 +1,6 @@
 import json
-import logging
 import os
 import pickle
-from logging.handlers import RotatingFileHandler
 from time import sleep
 from typing import Any
 
@@ -11,12 +9,15 @@ from cryptography.fernet import Fernet
 from pydantic import BaseModel
 from pymongo import MongoClient
 
-from database.basic_mongo import UserDocument, LogDocument
-from log.basic_log_types import LogOrigins, log_type_info
-from responses.basic_responses import BasicResponse
-from security.basic_encription import ObjectEncryptor
-from utils import utils
+from api.db.basic_mongo import UserDocument, LogDocument
+from api.log.basic_log_types import LogOrigins, log_type_info
+from api.responses.basic_responses import BasicResponse
+from api.security.basic_encription import ObjectEncryptor
+from api.utils import utils
 
+
+class TestConfig:
+    TESTING = True
 
 class BasicServerConfig(BaseModel):
     """
@@ -331,40 +332,6 @@ class BasicSecurityConfig:
 
         return response
 
-
-class BasicLoggerConfig:
-    def __init__(
-        self,
-        log_file: str,
-        log_name: str = "Visia-BackEnd_Logger",
-        max_log_size: int = (5 * 1024 * 1024),
-        backup_count: int = 3,
-    ):
-        self.logger = logging.getLogger(log_name)
-        self.logger.setLevel(logging.INFO)
-
-        # Create a formatter to add the time, name, level and message of the log
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-
-        # Create a file handler to store logs in a file
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=max_log_size, backupCount=backup_count
-        )
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-
-        # Create a stream handler to print logs in the console
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)
-
-    def get_logger(self):
-        return self.logger
-
-
 class BasicCameraConfig(BaseModel):
     path_to_config: str
     controller_path: str = r"C:\Program Files (x86)\digiCamControl"
@@ -385,7 +352,7 @@ class BasicCameraConfig(BaseModel):
 
     type: str = "Camera"
 
-    def load_config(self):
+    def load_config(self, logger) -> bool:
         """
         Load the configuration from the JSON file.
         """
@@ -404,8 +371,10 @@ class BasicCameraConfig(BaseModel):
                 logger.info("Camera: Configuration loaded successfully")
             except Exception as e:
                 logger.error(f"Camera: Error loading configuration - {e}")
+                return False
 
         logger.info(f"Camera: Configuration read - {self.model_dump()}")
+        return True
 
     @staticmethod
     def load_config_from_json(path: str) -> Any | None:
@@ -423,10 +392,3 @@ class BasicCameraConfig(BaseModel):
         except Exception or IOError as e:
             print(f"Error loading object: {e}")
             return None
-
-
-# Create a logger
-logger_config = BasicLoggerConfig(
-    log_file=os.path.join(os.getcwd(), "logs", "backend.log")
-)
-logger = logger_config.get_logger()
