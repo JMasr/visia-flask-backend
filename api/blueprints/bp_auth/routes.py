@@ -62,6 +62,7 @@ def add_user():
         app_logger.error(f'{request.remote_addr} - "POST /login/addUser" - ERROR: {str(e)}')
     return response.model_dump_json()
 
+
 @bp_auth.route("/login/deleteUser", methods=["POST"])
 def delete_user():
     """
@@ -95,6 +96,7 @@ def delete_user():
         app_logger.error(f'{request.remote_addr} - "POST /login/deleteUser" - ERROR: {str(e)}')
 
     return response.model_dump_json()
+
 
 @bp_auth.route("/requestAccessTokenByUser", methods=["POST"])
 @cross_origin()
@@ -134,7 +136,8 @@ def get_access_token_by_user():
                 access_token=access_token,
                 refresh_token=refresh_token,
             )
-            app_logger.info(f'{request.remote_addr} - "POST /requestAccessTokenByUser" - OK: Tokens created successfully')
+            app_logger.info(
+                f'{request.remote_addr} - "POST /requestAccessTokenByUser" - OK: Tokens created successfully')
         else:
             LogDocument(
                 log_origin=LogOrigins.BACKEND.value,
