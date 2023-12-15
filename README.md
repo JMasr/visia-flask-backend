@@ -3,12 +3,12 @@ Repository of the Visia's Backend using Flask+MongoDB
 
 ### Requirements
 
-* A MongoDB instance running on the default port (27017) 
+* A [MongoDB](https://www.mongodb.com/try/download/community) instance running on the default port (27017)
 * Python 3.10 or higher
 
 
 ### Installation
-1. Clone the repository
+1. Clone the repository on [GitHub](https://github.com/JMasr/visia-flask-backend)
 
 2. Install the requirements:
     ```bash
