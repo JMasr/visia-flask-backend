@@ -11,13 +11,18 @@ from api.config.backend_config import BasicSecurityConfig, BasicMongoConfig
 from api.db.basic_mongo import VideoActionsMongoDB, LogDocument
 from api.hardware.cam import Camera
 from api.log import app_logger
-from api.log.basic_log_types import LogOrigins, log_type_info, log_type_error, log_type_warning
+from api.log.basic_log_types import (
+    LogOrigins,
+    log_type_info,
+    log_type_error,
+    log_type_warning,
+)
 from api.responses.basic_responses import BasicResponse, DataResponse, ListResponse
 from api.utils.backup import BackUp
 from api.utils.files import BasicFileConfig, check_for_new_files, get_video_properties
 from api.utils.utils import get_now_standard
 
-bp_video = Blueprint('bp_video', __name__)
+bp_video = Blueprint("bp_video", __name__)
 
 # Data Handler Section
 file_config = BasicFileConfig()
@@ -25,14 +30,13 @@ file_config.update_upload_files()
 
 # Set the secret key to enable JWT authentication
 security_config = BasicSecurityConfig(
-        path_to_secrets=os.path.join(os.getcwd(), "secrets")
-    )
+    path_to_secrets=os.path.join(os.getcwd(), "secrets")
+)
 
 # Create a backup
 mongo_config = BasicMongoConfig(path_to_config=os.path.join(os.getcwd(), "secrets"))
 mongo_config.load_credentials()
 backup = BackUp(mongo_config)
-
 
 # Configure the camera if a config file is present
 camera = Camera()
@@ -74,6 +78,9 @@ def record_video(duration: float = 10) -> str:
         return BasicResponse(
             success=False, status_code=500, message=str(e)
         ).model_dump_json()
+    finally:
+        camera.close_program()
+
 
 @bp_video.route("/video/digicam/startVideo", methods=["GET"])
 # @jwt_required()
@@ -121,6 +128,7 @@ def digicam_start_video() -> str:
             success=False, status_code=500, message=str(e)
         ).model_dump_json()
 
+
 @bp_video.route("/video/digicam/stopVideo", methods=["GET"])
 # @jwt_required()
 @cross_origin()
@@ -132,20 +140,94 @@ def digicam_stop_video() -> str:
     # Log the request
     app_logger.info(f'{request.remote_addr} - "POST /video/digicam/stopVideo"')
 
-    # Save the number of files before recording
-    file_config.update_upload_files()
+    try:
+        # Save the number of files before recording
+        file_config.update_upload_files()
 
-    # Stop the recording
-    recording_r: BasicResponse = camera.stop_recording()
-    # Log the response
-    if recording_r.success:
-        app_logger.info(f"{request.remote_addr} - POST /video/digicam/stopVideo - 200")
-    else:
+        # Stop the recording
+        recording_r: BasicResponse = camera.stop_recording()
+        # Log the response
+        if recording_r.success:
+            app_logger.info(
+                f"{request.remote_addr} - POST /video/digicam/stopVideo - 200"
+            )
+        else:
+            app_logger.error(
+                f"{request.remote_addr} -POST /video/digicam/stopVideo - 500 - Error: {recording_r.message}"
+            )
+
+        return recording_r.model_dump_json()
+    except Exception as e:
         app_logger.error(
-            f"{request.remote_addr} -POST /video/digicam/stopVideo - 500 - Error: {recording_r.message}"
+            f'{request.remote_addr} - "POST /video/digicam/stopVideo" - 500 - Error: {e}'
         )
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
 
-    return recording_r.model_dump_json()
+
+@bp_video.route("/video/digicam/preview", methods=["GET"])
+# @jwt_required()
+@cross_origin()
+def digicam_preview():
+    """
+    Use digicam to record a video and take one frame as a visualization of the camera
+    """
+    # Log the request
+    app_logger.info(f'{request.remote_addr} - "GET /video/digicam/preview"')
+
+    try:
+        if not camera.is_running():
+            app_logger.warning(
+                f'{request.remote_addr} - "GET /video/digicam/preview" - digicam isnt running'
+            )
+            camera.run_digicam()
+
+        camera_response = camera.start_recording()
+        if camera_response.success:
+            app_logger.info(
+                f'{request.remote_addr} - "GET /video/digicam/preview" - OK - digiCam start the recording'
+            )
+
+            file_config.update_upload_files()
+            time.sleep(1.5)
+            camera_response = camera.stop_recording()
+
+            if camera_response.success:
+                app_logger.info(
+                    f'{request.remote_addr} - "GET /video/digicam/preview" - OK - digiCam stop the recording'
+                )
+
+                # Way for the video transferring
+                if check_for_new_files(
+                        path_folder=file_config.uploads_path,
+                        previous_files=file_config.upload_files,
+                        timer_seconds=120,
+                ):
+                    video_path: str = file_config.get_last_created()
+                    response = send_video_frame_as_json(video_path)
+                    file_config.delete_all_files()
+
+                    app_logger.info(
+                        f'{request.remote_addr} - "GET /video/digicam/preview" - OK - Video recorded and upload'
+                    )
+
+                    return response.model_dump_json()
+
+        app_logger.error(
+            f'{request.remote_addr} - "GET /video/digicam/preview" - 501 - Video Recorded but not uploaded'
+        )
+        return BasicResponse(
+            success=False, status_code=501, message=camera_response.message
+        ).model_dump_json()
+    except Exception as e:
+        app_logger.error(
+            f'{request.remote_addr} - "GET /video/digicam/preview" - Error {e}'
+        )
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
+
 
 @bp_video.route("/file/checkFile", methods=["GET"])
 # @jwt_required()
@@ -158,25 +240,37 @@ def check_new_file():
     # Log the request
     app_logger.info(f'{request.remote_addr} - "POST /files/checkFiles"')
 
-    # Way for the file transferring/storage/etc
-    if not file_config.check_for_new_files():
-        app_logger.warning(
-            f"{request.remote_addr} - POST /files/checkFiles - WARNING - Nothing found on: {file_config.upload_files}"
+    try:
+        # Way for the file transferring/storage/etc
+        if not file_config.check_for_new_files():
+            app_logger.warning(
+                f"{request.remote_addr} - POST /files/checkFiles - "
+                f"WARNING - Nothing found on: {file_config.upload_files}"
+            )
+
+            return BasicResponse(
+                success=False, status_code=500, message="No new files found"
+            ).model_dump_json()
+
+        app_logger.info(
+            f"{request.remote_addr} - POST /files/checkFiles - OK - New file found: {file_config.get_last_created()}"
         )
 
         return BasicResponse(
-            success=False, status_code=500, message="No new files found"
+            success=True,
+            status_code=200,
+            message=f"New file found: {file_config.get_last_created()}",
         ).model_dump_json()
 
-    app_logger.info(
-        f"{request.remote_addr} - POST /files/checkFiles - OK - New file found: {file_config.get_last_created()}"
-    )
+    except Exception as e:
+        # Add a log
+        app_logger.error(
+            f"{request.remote_addr} - POST /files/checkFiles - 500 - Error: {e}"
+        )
+        return BasicResponse(
+            success=False, status_code=500, message=str(e)
+        ).model_dump_json()
 
-    return BasicResponse(
-        success=True,
-        status_code=200,
-        message=f"New file found: {file_config.get_last_created()}",
-    ).model_dump_json()
 
 @bp_video.route("/file/uploadLastCreated", methods=["POST"])
 # @jwt_required()
@@ -277,67 +371,6 @@ def save_new_file(video_format: str = "mp4") -> str:
             success=False, status_code=500, message=str(e)
         ).model_dump_json()
 
-@bp_video.route("/video/digicam/preview", methods=["GET"])
-# @jwt_required()
-@cross_origin()
-def digicam_preview():
-    """
-    Use digicam to record a video and take one frame as a visualization of the camera
-    """
-    # Log the request
-    app_logger.info(f'{request.remote_addr} - "GET /video/digicam/preview"')
-
-    try:
-        if not camera.is_running():
-            app_logger.warning(
-                f'{request.remote_addr} - "GET /video/digicam/preview" - digicam isnt running'
-            )
-            camera.run_digicam()
-
-        camera_response = camera.start_recording()
-        if camera_response.success:
-            app_logger.info(
-                f'{request.remote_addr} - "GET /video/digicam/preview" - OK - digiCam start the recording'
-            )
-
-            file_config.update_upload_files()
-            time.sleep(1.5)
-            camera_response = camera.stop_recording()
-
-            if camera_response.success:
-                app_logger.info(
-                    f'{request.remote_addr} - "GET /video/digicam/preview" - OK - digiCam stop the recording'
-                )
-
-                # Way for the video transferring
-                if check_for_new_files(
-                        path_folder=file_config.uploads_path,
-                        previous_files=file_config.upload_files,
-                        timer_seconds=120,
-                ):
-                    video_path: str = file_config.get_last_created()
-                    response = send_video_frame_as_json(video_path)
-                    file_config.delete_all_files()
-
-                    app_logger.info(
-                        f'{request.remote_addr} - "GET /video/digicam/preview" - OK - Video recorded and upload'
-                    )
-
-                    return response.model_dump_json()
-
-        app_logger.error(
-            f'{request.remote_addr} - "GET /video/digicam/preview" - 501 - Video Recorded but not uploaded'
-        )
-        return BasicResponse(
-            success=False, status_code=501, message=camera_response.message
-        ).model_dump_json()
-    except Exception as e:
-        app_logger.error(
-            f'{request.remote_addr} - "GET /video/digicam/preview" - Error {e}'
-        )
-        return BasicResponse(
-            success=False, status_code=500, message=str(e)
-        ).model_dump_json()
 
 def send_video_frame_as_json(video_path: str, frame_number: int = 0) -> BasicResponse:
     """
@@ -401,6 +434,7 @@ def send_video_frame_as_json(video_path: str, frame_number: int = 0) -> BasicRes
         # Release the video capture object
         if cap:
             cap.release()
+
 
 @bp_video.route("/video/uploads", methods=["POST"])
 @jwt_required()
@@ -482,6 +516,7 @@ def upload_video(save_test: bool = True) -> str:
 
     return response.model_dump_json()
 
+
 @bp_video.route("/video/downloadBy", methods=["GET"])
 def download_video():
     """
@@ -528,7 +563,8 @@ def download_video():
                 message=f"Video/s downloaded successfully: {videos_found}",
             ).save()
             app_logger.info(
-                f'{request.remote_addr} - "GET /video/downloadBy" - OK - Video/s downloaded successfully: {videos_found}'
+                f'{request.remote_addr} - "GET /video/downloadBy" - '
+                f'OK - Video/s downloaded successfully: {videos_found}'
             )
 
             response = ListResponse(
@@ -564,6 +600,7 @@ def download_video():
 
     return response.model_dump_json()
 
+
 # Backup Section
 @bp_video.route("/backup/make", methods=["GET"])
 @cross_origin()
@@ -577,21 +614,28 @@ def make_backup():
 
     try:
         if backup.make_():
-            app_logger.info(f'{request.remote_addr} - "GET /backup/make" - OK - Backup created successfully')
+            app_logger.info(
+                f'{request.remote_addr} - "GET /backup/make" - OK - Backup created successfully'
+            )
             response = BasicResponse(
                 success=True,
                 status_code=200,
                 message="Backup created successfully",
             )
         else:
-            app_logger.error(f'{request.remote_addr} - "GET /backup/make" - 400 - Backup not created')
+            app_logger.error(
+                f'{request.remote_addr} - "GET /backup/make" - 400 - Backup not created'
+            )
             response = BasicResponse(
                 success=False, status_code=400, message="Backup not created"
             )
     except Exception as e:
-        app_logger.error(f'{request.remote_addr} - "GET /backup/make" - 500 - Error: {e}')
+        app_logger.error(
+            f'{request.remote_addr} - "GET /backup/make" - 500 - Error: {e}'
+        )
         response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()
+
 
 @bp_video.route("/backup/restore", methods=["GET"])
 @cross_origin()
@@ -639,7 +683,9 @@ def restore_backup():
             log_type=log_type_error,
             message=str(e),
         ).save()
-        app_logger.error(f'{request.remote_addr} - "GET /backup/restore" - 500 - Error: {e}')
+        app_logger.error(
+            f'{request.remote_addr} - "GET /backup/restore" - 500 - Error: {e}'
+        )
 
         response = BasicResponse(success=False, status_code=500, message=str(e))
     return response.model_dump_json()

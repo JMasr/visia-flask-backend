@@ -19,6 +19,7 @@ from api.utils import utils
 class TestConfig:
     TESTING = True
 
+
 class BasicServerConfig(BaseModel):
     """
     Class to handle the configuration of the Frontend.
@@ -331,6 +332,7 @@ class BasicSecurityConfig:
             response = BasicResponse(success=False, status_code=500, message=str(e))
 
         return response
+
 
 class BasicCameraConfig(BaseModel):
     path_to_config: str

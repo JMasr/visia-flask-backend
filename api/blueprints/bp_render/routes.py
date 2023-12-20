@@ -11,7 +11,7 @@ from api.log.basic_log_types import LogOrigins, log_type_info, log_type_error
 from api.responses.basic_responses import DataResponse
 
 # Set the blueprint
-bp_render = Blueprint('bp_render', __name__)
+bp_render = Blueprint("bp_render", __name__)
 
 # Configure FrontEnd
 react_app = BasicServerConfig(
@@ -45,7 +45,9 @@ def get_record_session_data():
             message="Data for Record-Session is ready",
             data=record_data.model_dump(),
         )
-        app_logger.info(f'{request.remote_addr} - "GET /render/getRecordData" - OK: {response.message}')
+        app_logger.info(
+            f'{request.remote_addr} - "GET /render/getRecordData" - OK: {response.message}'
+        )
 
     except ValueError as e:
         response = DataResponse(
@@ -54,13 +56,17 @@ def get_record_session_data():
             message=f"Value Error: {e}",
             data={},
         )
-        app_logger.error(f'{request.remote_addr} - "GET /render/getRecordData" - ERROR: {response.message}')
+        app_logger.error(
+            f'{request.remote_addr} - "GET /render/getRecordData" - ERROR: {response.message}'
+        )
 
     except Exception as e:
         response = DataResponse(
             success=False, status_code=400, message=f"Error: {e}", data={}
         )
-        app_logger.error(f'{request.remote_addr} - "GET /render/getRecordData" - ERROR: {response.message}')
+        app_logger.error(
+            f'{request.remote_addr} - "GET /render/getRecordData" - ERROR: {response.message}'
+        )
 
     return response.model_dump()
 
@@ -83,7 +89,9 @@ def get_render_video():
             log_type=log_type_info,
             message=f"Video requested: {record_data.crd_id}--{record_data.ov}",
         ).save()
-        app_logger.info(f'{request.remote_addr} - "GET /video" - OK: Video requested: {record_data.crd_id}--{record_data.ov}')
+        app_logger.info(
+            f'{request.remote_addr} - "GET /video" - OK: Video requested: {record_data.crd_id}--{record_data.ov}'
+        )
     except Exception as e:
         LogDocument(
             log_origin=LogOrigins.BACKEND.value,

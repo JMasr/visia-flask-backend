@@ -10,7 +10,7 @@ from api.log import app_logger
 from api.responses.basic_responses import BasicResponse
 from api.utils.files import BasicFileConfig
 
-bp_general = Blueprint('bp_general', __name__)
+bp_general = Blueprint("bp_general", __name__)
 
 # Data Handler Section
 file_config = BasicFileConfig()
@@ -18,8 +18,8 @@ file_config.update_upload_files()
 
 # Set the secret key to enable JWT authentication
 security_config = BasicSecurityConfig(
-        path_to_secrets=os.path.join(os.getcwd(), "secrets")
-    )
+    path_to_secrets=os.path.join(os.getcwd(), "secrets")
+)
 
 # Configure MongoDB
 mongo_config = BasicMongoConfig(path_to_config=os.path.join(os.getcwd(), "secrets"))
@@ -37,6 +37,7 @@ def index():
     app_logger.info(f'{request.remote_addr} - "GET /" -')
     return "Welcome to the VISIA-BackEnd v2.0!"
 
+
 @bp_general.route("/favicon.ico")
 def favicon():
     """
@@ -49,6 +50,7 @@ def favicon():
         "favicon.ico",
         mimetype="image/vnd.microsoft.icon",
     )
+
 
 @bp_general.route("/poll")
 @cross_origin()
@@ -90,13 +92,16 @@ def poll():
 
     return response.model_dump_json()
 
+
 @bp_general.errorhandler(404)
 def resource_not_found():
     """
     An error-handler to ensure that 404 errors are returned as JSON.
     :return: A BasicResponse representing a 404 error.
     """
-    app_logger.error(f'{request.remote_addr} - "GET /{request.url}" - ERROR: Resource not found')
+    app_logger.error(
+        f'{request.remote_addr} - "GET /{request.url}" - ERROR: Resource not found'
+    )
     response = BasicResponse(
         success=False,
         status_code=404,
@@ -104,13 +109,16 @@ def resource_not_found():
     )
     return response.model_dump()
 
+
 @bp_general.errorhandler(DuplicateKeyError)
 def resource_not_found(e):
     """
     An error-handler to ensure that MongoDB duplicate key errors are returned as JSON.
     :return: A BasicResponse representing a duplicate key error from MongoDB.
     """
-    app_logger.error(f'{request.remote_addr} - "GET /{request.url}" - ERROR: Duplicate key error: {str(e)}')
+    app_logger.error(
+        f'{request.remote_addr} - "GET /{request.url}" - ERROR: Duplicate key error: {str(e)}'
+    )
     response = BasicResponse(
         success=False,
         status_code=500,

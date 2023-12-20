@@ -1,7 +1,7 @@
-import os
-
 from flask import Flask
+
 from api.api import APP
+
 
 def create_app(deploy: bool = True) -> Flask:
     """

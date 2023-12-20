@@ -10,7 +10,11 @@ from api.blueprints.bp_general.routes import bp_general
 from api.blueprints.bp_logs.routes import bp_logs
 from api.blueprints.bp_render.routes import bp_render
 from api.blueprints.bp_video.routes import bp_video
-from api.config.backend_config import BasicServerConfig, BasicMongoConfig, BasicSecurityConfig
+from api.config.backend_config import (
+    BasicServerConfig,
+    BasicMongoConfig,
+    BasicSecurityConfig,
+)
 from api.hardware.cam import Camera
 from api.log import app_logger
 from api.utils.backup import BackUp
@@ -20,6 +24,7 @@ class APP:
     """
     Class to create a Flask api with the specified configuration.
     """
+
     def __init__(self, deploy: bool = True):
         """
         Initialize the class with the specified configuration.
@@ -43,7 +48,9 @@ class APP:
         self.react_app.load_config()
 
         # Configure MongoDB
-        self.mongo_config = BasicMongoConfig(path_to_config=os.path.join(os.getcwd(), "secrets"))
+        self.mongo_config = BasicMongoConfig(
+            path_to_config=os.path.join(os.getcwd(), "secrets")
+        )
         self.mongo_config.load_credentials()
 
         # Set the secret key to enable JWT authentication
@@ -57,6 +64,7 @@ class APP:
         # Start the camera
         self.camera = Camera()
         self.camera.run_digicam()
+
     def create_app(self) -> Flask:
         """
         Create a Flask api with the specified configuration.
@@ -70,6 +78,7 @@ class APP:
             app.config.from_object(None)
         else:
             from config.backend_config import TestConfig
+
             app.config.from_object(TestConfig)
 
         # Register the blueprints
@@ -89,9 +98,12 @@ class APP:
         jwt = JWTManager(app)
 
         # Enable CORS for all routes
-        CORS(app, resources={r"/*": {"origins": f"{self.react_app.host}:{self.react_app.port}"}})
-
-        # Register the blueprints
+        CORS(
+            app,
+            resources={
+                r"/*": {"origins": f"{self.react_app.host}:{self.react_app.port}"}
+            },
+        )
 
         # Check the server status
         self.logger.info("*** Starting the backend ***")
@@ -101,7 +113,8 @@ class APP:
             f' - Status: {"UP" if self.mongo_config.server_is_up() else "DOWN"}'
         )
         self.logger.info(
-            f'UI: {self.react_app.host}:{self.react_app.port} - Status: {"UP" if self.react_app.server_is_up() else "DOWN"}'
+            f'UI: {self.react_app.host}:{self.react_app.port} - '
+            f'Status: {"UP" if self.react_app.server_is_up() else "DOWN"}'
         )
 
         return app

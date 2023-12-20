@@ -1,4 +1,3 @@
-
 import os
 
 from api.log.basic_log_types import BasicLogger

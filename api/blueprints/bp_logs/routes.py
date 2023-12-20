@@ -6,7 +6,7 @@ from api.log import app_logger
 from api.log.basic_log_types import LogOrigins
 from api.responses.basic_responses import BasicResponse
 
-bp_logs = Blueprint('bp_logs', __name__)
+bp_logs = Blueprint("bp_logs", __name__)
 
 
 @bp_logs.route("/log/addLogFrontEnd", methods=["POST"])
@@ -23,7 +23,9 @@ def upload_log_frontend() -> str:
         log_type = request.json.get("log_type")
         message = request.json.get("message")
 
-        app_logger.info(f'{request.remote_addr} - "POST /log/addLogFrontEnd" - OK: {message}')
+        app_logger.info(
+            f'{request.remote_addr} - "POST /log/addLogFrontEnd" - OK: {message}'
+        )
         response = LogActionsMongoDB(
             log_origin=LogOrigins.FRONTEND.value,
             log_type=log_type,
@@ -31,10 +33,15 @@ def upload_log_frontend() -> str:
         ).insert_log()
 
     except Exception as e:
-        app_logger.error(f'{request.remote_addr} - "POST /log/addLogFrontEnd" - ERROR: {e}')
-        response = BasicResponse(success=False, status_code=400, message=f"Bad request: {e}")
+        app_logger.error(
+            f'{request.remote_addr} - "POST /log/addLogFrontEnd" - ERROR: {e}'
+        )
+        response = BasicResponse(
+            success=False, status_code=400, message=f"Bad request: {e}"
+        )
 
     return response.model_dump_json()
+
 
 @bp_logs.route("/log/addLogBackEnd", methods=["POST"])
 def upload_log_backend() -> str:
@@ -49,15 +56,22 @@ def upload_log_backend() -> str:
         log_type = request.json.get("log_type")
         message = request.json.get("message")
 
-        app_logger.info(f'{request.remote_addr} - "POST /log/addLogBackEnd" - OK: {message}')
+        app_logger.info(
+            f'{request.remote_addr} - "POST /log/addLogBackEnd" - OK: {message}'
+        )
         response = LogActionsMongoDB(
             log_origin=LogOrigins.BACKEND.value, log_type=log_type, message=message
         ).insert_log()
     except Exception as e:
-        app_logger.error(f'{request.remote_addr} - "POST /log/addLogBackEnd" - ERROR: {e}')
-        response = BasicResponse(success=False, status_code=400, message=f"Bad request: {e}")
+        app_logger.error(
+            f'{request.remote_addr} - "POST /log/addLogBackEnd" - ERROR: {e}'
+        )
+        response = BasicResponse(
+            success=False, status_code=400, message=f"Bad request: {e}"
+        )
 
     return response.model_dump_json()
+
 
 # Endpoint to retrieve logs by type
 @bp_logs.route("/log/getLogsBy", methods=["GET"])
@@ -78,9 +92,13 @@ def get_logs_by() -> str:
         query = {key: value for key, value in data.items() if value != ""}
         # Create a Log Action
         response = LogActionsMongoDB.get_logs_by_type(query)
-        app_logger.info(f'{request.remote_addr} - "GET /log/getLogsBy" - OK: {response.message}')
+        app_logger.info(
+            f'{request.remote_addr} - "GET /log/getLogsBy" - OK: {response.message}'
+        )
     except Exception as e:
         response = BasicResponse(success=False, status_code=500, message=str(e))
-        app_logger.error(f'{request.remote_addr} - "GET /log/getLogsBy" - ERROR: {str(e)}')
+        app_logger.error(
+            f'{request.remote_addr} - "GET /log/getLogsBy" - ERROR: {str(e)}'
+        )
 
     return response.model_dump_json()

@@ -7,10 +7,15 @@ from flask_jwt_extended import create_access_token, create_refresh_token
 from api.config.backend_config import BasicSecurityConfig
 from api.db.basic_mongo import UserDocument, LogDocument
 from api.log import app_logger
-from api.log.basic_log_types import LogOrigins, log_type_info, log_type_warning, log_type_error
+from api.log.basic_log_types import (
+    LogOrigins,
+    log_type_info,
+    log_type_warning,
+    log_type_error,
+)
 from api.responses.basic_responses import BasicResponse, TokenResponse
 
-bp_auth = Blueprint('bp_auth', __name__)
+bp_auth = Blueprint("bp_auth", __name__)
 
 # Set the secret key to enable JWT authentication
 security_config = BasicSecurityConfig(
@@ -43,7 +48,9 @@ def add_user():
                     status_code=200,
                     message="User already exists",
                 )
-                app_logger.warning(f'{request.remote_addr} - "POST /login/addUser" - OK: User already exists')
+                app_logger.warning(
+                    f'{request.remote_addr} - "POST /login/addUser" - OK: User already exists'
+                )
             else:
                 user.save()
                 response = BasicResponse(
@@ -51,16 +58,23 @@ def add_user():
                     status_code=200,
                     message="User added successfully",
                 )
-                app_logger.info(f'{request.remote_addr} - "POST /login/addUser" - OK: User added successfully')
+                app_logger.info(
+                    f'{request.remote_addr} - "POST /login/addUser" - OK: User added successfully'
+                )
         else:
             response = BasicResponse(
                 success=False, status_code=400, message="Bad request"
             )
-            app_logger.info(f'{request.remote_addr} - "POST /login/addUser" - ERROR: Bad request')
+            app_logger.info(
+                f'{request.remote_addr} - "POST /login/addUser" - ERROR: Bad request'
+            )
     except Exception as e:
         response = BasicResponse(success=False, status_code=500, message=str(e))
-        app_logger.error(f'{request.remote_addr} - "POST /login/addUser" - ERROR: {str(e)}')
+        app_logger.error(
+            f'{request.remote_addr} - "POST /login/addUser" - ERROR: {str(e)}'
+        )
     return response.model_dump_json()
+
 
 @bp_auth.route("/login/deleteUser", methods=["POST"])
 def delete_user():
@@ -84,17 +98,24 @@ def delete_user():
                 status_code=200,
                 message="User deleted successfully",
             )
-            app_logger.info(f'{request.remote_addr} - "POST /login/deleteUser" - OK: User deleted successfully')
+            app_logger.info(
+                f'{request.remote_addr} - "POST /login/deleteUser" - OK: User deleted successfully'
+            )
         else:
             response = BasicResponse(
                 success=False, status_code=400, message="Bad request"
             )
-            app_logger.error(f'{request.remote_addr} - "POST /login/deleteUser" - ERROR: Bad request')
+            app_logger.error(
+                f'{request.remote_addr} - "POST /login/deleteUser" - ERROR: Bad request'
+            )
     except Exception as e:
         response = BasicResponse(success=False, status_code=500, message=str(e))
-        app_logger.error(f'{request.remote_addr} - "POST /login/deleteUser" - ERROR: {str(e)}')
+        app_logger.error(
+            f'{request.remote_addr} - "POST /login/deleteUser" - ERROR: {str(e)}'
+        )
 
     return response.model_dump_json()
+
 
 @bp_auth.route("/requestAccessTokenByUser", methods=["POST"])
 @cross_origin()
@@ -134,7 +155,9 @@ def get_access_token_by_user():
                 access_token=access_token,
                 refresh_token=refresh_token,
             )
-            app_logger.info(f'{request.remote_addr} - "POST /requestAccessTokenByUser" - OK: Tokens created successfully')
+            app_logger.info(
+                f'{request.remote_addr} - "POST /requestAccessTokenByUser" - OK: Tokens created successfully'
+            )
         else:
             LogDocument(
                 log_origin=LogOrigins.BACKEND.value,
@@ -144,7 +167,9 @@ def get_access_token_by_user():
             response = BasicResponse(
                 success=False, status_code=401, message="Invalid credentials"
             )
-            app_logger.warning(f'{request.remote_addr} - "POST /requestAccessTokenByUser" - ERROR: Invalid credentials')
+            app_logger.warning(
+                f'{request.remote_addr} - "POST /requestAccessTokenByUser" - ERROR: Invalid credentials'
+            )
     except Exception as e:
         LogDocument(
             log_origin=LogOrigins.BACKEND.value,
@@ -152,5 +177,7 @@ def get_access_token_by_user():
             message=f"Error: {e}",
         ).save()
         response = BasicResponse(success=False, status_code=500, message=str(e))
-        app_logger.error(f'{request.remote_addr} - "POST /requestAccessTokenByUser" - ERROR: {str(e)}')
+        app_logger.error(
+            f'{request.remote_addr} - "POST /requestAccessTokenByUser" - ERROR: {str(e)}'
+        )
     return response.model_dump_json()

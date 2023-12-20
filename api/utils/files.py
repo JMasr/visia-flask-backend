@@ -41,7 +41,9 @@ def check_for_new_files(
 
         # Check if the timer exceeds the limit
         if time.time() - start_time >= timer_seconds:
-            app_logger.info("127.0.0.1 - util.check_for_new_files - Timer limit reached")
+            app_logger.info(
+                "127.0.0.1 - util.check_for_new_files - Timer limit reached"
+            )
             break
 
         # Wait for a short interval before checking again
@@ -57,7 +59,9 @@ def get_last_created_file(path_folder: str) -> Optional[str]:
     @return: The last created file in the folder or None if the folder is empty
     """
     if not (path_folder and os.path.exists(path_folder) and os.path.isdir(path_folder)):
-        app_logger.warning("127.0.0.1 - util.get_last_created_file - Invalid path folder")
+        app_logger.warning(
+            "127.0.0.1 - util.get_last_created_file - Invalid path folder"
+        )
         return None
 
     try:
@@ -127,7 +131,9 @@ def get_video_properties(video_path: str) -> dict:
         )
         return video_properties
     except Exception as e:
-        app_logger.error(f"Video - Properties - Error - Fails to get video properties: {e}")
+        app_logger.error(
+            f"Video - Properties - Error - Fails to get video properties: {e}"
+        )
         return video_properties
 
 
