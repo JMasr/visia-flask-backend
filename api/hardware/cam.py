@@ -1,8 +1,8 @@
 import os
-import time
-import psutil
 import subprocess
+import time
 
+import psutil
 
 from api.config.backend_config import BasicCameraConfig
 from api.log import app_logger
@@ -62,7 +62,7 @@ class Camera:
                     app_logger.info(
                         f"digiCamControl: @{self.exeDir} - Status: {cam_response.message}"
                     )
-                    time.sleep(10)
+                    # time.sleep(10)
                     return True
             else:
                 return True
@@ -123,6 +123,38 @@ class Camera:
                 status_code=200,
                 message="CameraControl.exe is running",
             )
+        except Exception as e:
+            app_logger.error(f"digiCamControl: @{self.exeDir} - Status: {e}")
+            return BasicResponse(
+                success=False,
+                status_code=500,
+                message="CameraControl.exe is not running",
+            )
+
+    def close_program(self) -> BasicResponse:
+        """
+        Closes the CameraControl.exe application.
+        return: BasicResponse indicating the success of the operation with a message.
+        """
+        try:
+            # Check if the program is running
+            if "CameraControl.exe" in (i.name() for i in psutil.process_iter()):
+                for proc in psutil.process_iter():
+                    if proc.name() == "CameraControl.exe":
+                        proc.kill()
+                app_logger.info(f"digiCamControl: @{self.exeDir} - Status: DOWN")
+                return BasicResponse(
+                    success=True,
+                    status_code=200,
+                    message="CameraControl.exe is now not running",
+                )
+            else:
+                app_logger.info(f"digiCamControl: @{self.exeDir} - Status: DOWN")
+                return BasicResponse(
+                    success=True,
+                    status_code=200,
+                    message="CameraControl.exe is not running",
+                )
         except Exception as e:
             app_logger.error(f"digiCamControl: @{self.exeDir} - Status: {e}")
             return BasicResponse(
@@ -259,6 +291,7 @@ class Camera:
         """
         try:
             # Start the live view window
+            time.sleep(5)
             cmd = [
                 os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
                 "/c",
@@ -303,7 +336,9 @@ class Camera:
                         message=f"Camera: Recording failed - Status: {response_cmd}",
                     )
             else:
-                app_logger.error(f"Camera: Live view start failed - Status: {response_cmd}")
+                app_logger.error(
+                    f"Camera: Live view start failed - Status: {response_cmd}"
+                )
                 return BasicResponse(
                     success=False,
                     status_code=500,
