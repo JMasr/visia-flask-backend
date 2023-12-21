@@ -113,7 +113,7 @@ class APP:
             f' - Status: {"UP" if self.mongo_config.server_is_up() else "DOWN"}'
         )
         self.logger.info(
-            f'UI: {self.react_app.host}:{self.react_app.port} - '
+            f"UI: {self.react_app.host}:{self.react_app.port} - "
             f'Status: {"UP" if self.react_app.server_is_up() else "DOWN"}'
         )
 
