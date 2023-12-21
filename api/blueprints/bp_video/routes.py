@@ -204,7 +204,7 @@ def digicam_preview():
                         previous_files=file_config.upload_files,
                         timer_seconds=120,
                 ):
-                    video_path: str = file_config.get_last_created()
+                    video_path: str = file_config.get_newest_file()
                     response = send_video_frame_as_json(video_path)
                     file_config.delete_all_files()
 
@@ -253,13 +253,13 @@ def check_new_file():
             ).model_dump_json()
 
         app_logger.info(
-            f"{request.remote_addr} - POST /files/checkFiles - OK - New file found: {file_config.get_last_created()}"
+            f"{request.remote_addr} - POST /files/checkFiles - OK - New file found: {file_config.get_newest_file()}"
         )
 
         return BasicResponse(
             success=True,
             status_code=200,
-            message=f"New file found: {file_config.get_last_created()}",
+            message=f"New file found: {file_config.get_newest_file()}",
         ).model_dump_json()
 
     except Exception as e:
@@ -303,7 +303,7 @@ def save_new_file(video_format: str = "mp4") -> str:
         ).model_dump_json()
 
     try:
-        video_path: str = file_config.get_last_created()
+        video_path: str = file_config.get_newest_file()
         app_logger.info(
             f"{request.remote_addr} - POST /files/uploadLastCreated - OK - New file found: {video_path}"
         )
@@ -564,7 +564,7 @@ def download_video():
             ).save()
             app_logger.info(
                 f'{request.remote_addr} - "GET /video/downloadBy" - '
-                f'OK - Video/s downloaded successfully: {videos_found}'
+                f"OK - Video/s downloaded successfully: {videos_found}"
             )
 
             response = ListResponse(
@@ -613,7 +613,7 @@ def make_backup():
     app_logger.info(f'{request.remote_addr} - "GET /backup/make" -')
 
     try:
-        if backup.make_():
+        if backup.mongo_dump():
             app_logger.info(
                 f'{request.remote_addr} - "GET /backup/make" - OK - Backup created successfully'
             )
