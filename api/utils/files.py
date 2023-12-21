@@ -52,7 +52,7 @@ def check_for_new_files(
     return False
 
 
-def get_last_created_file(path_folder: str) -> Optional[str]:
+def get_newest_file_in_folder(path_folder: str) -> Optional[str]:
     """
     Get the last file created in a specific folder.
     @param: path_folder: Path to the folder to be checked
@@ -65,20 +65,51 @@ def get_last_created_file(path_folder: str) -> Optional[str]:
         return None
 
     try:
-        # Get a list of files in the folder with their creation times
-        files_with_times = [
-            (file, os.path.getctime(os.path.join(path_folder, file)))
-            for file in os.listdir(path_folder)
-        ]
-
-        # Sort files by creation time (newest first)
-        sorted_files = sorted(files_with_times, key=lambda x: x[1], reverse=True)
+        sorted_files = files_in_folder_sorted_by_time(path_folder)
 
         # Return the name of the last created file
         return sorted_files[0][0] if sorted_files else None
     except Exception as e:
         app_logger.error(f"127.0.0.1 - util.get_last_created_file - Error: {e}")
         return None
+
+
+def get_older_file_in_folder(path_folder: str) -> Optional[str]:
+    """
+    Get the older file created in a specific folder.
+    @param: path_folder: Path to the folder to be checked
+    @return: The older file in the folder or None if the folder is empty
+    """
+    if not (path_folder and os.path.exists(path_folder) and os.path.isdir(path_folder)):
+        app_logger.warning(
+            "127.0.0.1 - util.get_last_created_file - Invalid path folder"
+        )
+        return None
+
+    try:
+        sorted_files = files_in_folder_sorted_by_time(path_folder)
+
+        # Return the name of the last created file
+        return sorted_files[-1][-1] if sorted_files else None
+    except Exception as e:
+        app_logger.error(f"127.0.0.1 - util.get_last_created_file - Error: {e}")
+        return None
+
+
+def files_in_folder_sorted_by_time(path_folder: str) -> list:
+    """
+    List and sort by creation time all the files in a directory.
+    @param: path_folder: Path to the directory
+    @return: A list with all the files sorted by creation time.
+    """
+    # Get a list of files in the folder with their creation times
+    files_with_times = [
+        (file, os.path.getctime(os.path.join(path_folder, file)))
+        for file in os.listdir(path_folder)
+    ]
+    # Sort files by creation time (newest first)
+    sorted_files = sorted(files_with_times, key=lambda x: x[1], reverse=True)
+    return sorted_files
 
 
 def get_video_properties(video_path: str) -> dict:
@@ -151,11 +182,13 @@ class BasicFileConfig(BaseModel):
         """
         self.upload_files = os.listdir(self.uploads_path)
 
-    def get_last_created(self):
+    def get_newest_file(self):
         """
         Get the path to last created file in the upload folder.
         """
-        return os.path.join(self.uploads_path, get_last_created_file(self.uploads_path))
+        return os.path.join(
+            self.uploads_path, get_newest_file_in_folder(self.uploads_path)
+        )
 
     def exists(self, file_name: str = None) -> bool:
         """
