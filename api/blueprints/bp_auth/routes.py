@@ -7,12 +7,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token
 from api.config.backend_config import BasicSecurityConfig
 from api.db.basic_mongo import UserDocument, LogDocument
 from api.log import app_logger
-from api.log.basic_log_types import (
-    LogOrigins,
-    log_type_info,
-    log_type_warning,
-    log_type_error,
-)
+from api.log.basic_log_types import LogOrigins, log_type_info, log_type_warning, log_type_error
 from api.responses.basic_responses import BasicResponse, TokenResponse
 
 bp_auth = Blueprint("bp_auth", __name__)
@@ -155,9 +150,7 @@ def get_access_token_by_user():
                 access_token=access_token,
                 refresh_token=refresh_token,
             )
-            app_logger.info(
-                f'{request.remote_addr} - "POST /requestAccessTokenByUser" - OK: Tokens created successfully'
-            )
+            app_logger.info(f'{request.remote_addr} - "POST /requestAccessTokenByUser" - OK: Tokens created successfully')
         else:
             LogDocument(
                 log_origin=LogOrigins.BACKEND.value,
