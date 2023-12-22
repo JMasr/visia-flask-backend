@@ -18,8 +18,8 @@ class BackUp:
         self.mongo_config: BaseModel = mongo_config
         self.cmd_ext: str = ".exe" if platform.system() == "Windows" else ""
 
-        self.backup_count: int = 5
-        self.backup_by_day: int = 2
+        self.backup_count: int = 6
+        self.backup_by_day: int = 3
 
         self.actions_by_backup_status = {
             501: self.delete_old_backups,
@@ -186,7 +186,9 @@ class BackUp:
 
             # Set the path to the backup
             if incremental:
-                path_out = self.mongo_config.backup_path
+                path_out = os.path.join(
+                    self.mongo_config.backup_path, "visia_incremental"
+                )
             else:
                 path_out = os.path.join(
                     self.mongo_config.backup_path, get_now_standard()
@@ -211,8 +213,9 @@ class BackUp:
             ]
 
             # Run the command
-            cmd_response = subprocess.run(cmd)
+            subprocess.run(cmd)
             return True
+
         except Exception as e:
             print(f"Error making backup: {e}")
             return False
