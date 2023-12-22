@@ -15,9 +15,11 @@ class BackUp:
     """
 
     def __init__(self, mongo_config: BaseModel):
+        self.mongo_config: BaseModel = mongo_config
+        self.cmd_ext: str = ".exe" if platform.system() == "Windows" else ""
+
         self.backup_count: int = 5
         self.backup_by_day: int = 2
-        self.mongo_config: BaseModel = mongo_config
 
         self.actions_by_backup_status = {
             501: self.delete_old_backups,
@@ -161,62 +163,55 @@ class BackUp:
         response.log_response("Backup", "Delete Old Backups Per Day")
         return response
 
-    def mongo_dump(self) -> bool:
+    def mongo_dump(self, incremental: bool = True) -> bool:
         """
         Make a backup of the MongoDB database.
         @return: True if the backup was made, False otherwise.
         """
         try:
             # Create the backup path if it doesn't exist
-            os.makedirs(os.path.dirname(self.mongo_config.backup_path), exist_ok=True)
+            os.makedirs(self.mongo_config.backup_path, exist_ok=True)
 
             # Check the backup policies
             policies_status = self.check_backup_policies()
             if policies_status.status_code != 200:
                 self.resolve_backup_policies(policies_status.status_code)
 
-            # Make the backup
-            if platform.system() == "Windows":
-                # Define the command to run mongodump for Windows
-                cmd = [
-                    os.path.join(os.getcwd(), "utils", "mongodump.exe"),
-                    "--db",
-                    self.mongo_config.db,
-                    "--out",
-                    os.path.join(self.mongo_config.backup_path, get_now_standard()),
-                    "--username",
-                    self.mongo_config.username,
-                    "--password",
-                    self.mongo_config.password,
-                    "--authenticationDatabase",
-                    "admin",
-                    "--host",
-                    self.mongo_config.host,
-                    "--port",
-                    str(self.mongo_config.port),
-                ]
-            else:  # Assume it's Linux
-                # Define the command to run mongodump for Linux
-                cmd = [
-                    os.path.join(os.getcwd(), "utils", "mongodump"),
-                    "--db",
-                    self.mongo_config.db,
-                    "--out",
-                    os.path.join(self.mongo_config.backup_path, get_now_standard()),
-                    "--username",
-                    self.mongo_config.username,
-                    "--password",
-                    self.mongo_config.password,
-                    "--authenticationDatabase",
-                    "admin",
-                    "--host",
-                    self.mongo_config.host,
-                    "--port",
-                    str(self.mongo_config.port),
-                ]
+            # Set parameter for incremental backup
+            backup_fresh: str = (
+                ""
+                if "oplog.bson" in os.listdir(self.mongo_config.backup_path)
+                else "--oplog"
+            )
+
+            # Set the path to the backup
+            if incremental:
+                path_out = self.mongo_config.backup_path
+            else:
+                path_out = os.path.join(
+                    self.mongo_config.backup_path, get_now_standard()
+                )
+
+            # Define the command to run mongodump
+            cmd = [
+                os.path.join(os.getcwd(), "utils", f"mongodump{self.cmd_ext}"),
+                "--out",
+                path_out,
+                "--username",
+                self.mongo_config.username,
+                "--password",
+                self.mongo_config.password,
+                "--authenticationDatabase",
+                "admin",
+                "--host",
+                self.mongo_config.host,
+                "--port",
+                str(self.mongo_config.port),
+                backup_fresh if incremental else "",
+            ]
 
             # Run the command
-            subprocess.run(cmd)
+            cmd_response = subprocess.run(cmd)
             return True
         except Exception as e:
             print(f"Error making backup: {e}")
