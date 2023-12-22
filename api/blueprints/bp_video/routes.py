@@ -42,46 +42,6 @@ backup = BackUp(mongo_config)
 camera = Camera()
 
 
-@bp_video.route("/video/digicam/makeVideo", methods=["GET"])
-# @jwt_required()
-@cross_origin()
-def record_video(duration: float = 10) -> str:
-    """
-    Endpoint to record a video file using DigicamControl.
-    @param duration: The duration of the video in seconds.
-    """
-
-    app_logger.info(f'{request.remote_addr} - "GET /video/digicam/makeVideo" -')
-    if not camera.is_running():
-        app_logger.warning(
-            f'{request.remote_addr} - "GET /video/digicam/makeVideo" - digicam isnt running'
-        )
-        camera.run_digicam()
-    try:
-        camera_response = camera.start_recording()
-        if camera_response.success:
-            time.sleep(duration)
-            camera_response = camera.stop_recording()
-
-            if camera_response.success:
-                # TODO: send video to FrontEnd
-                return BasicResponse(
-                    success=True, status_code=200, message="Video recorded successfully"
-                ).model_dump_json()
-        return BasicResponse(
-            success=False, status_code=500, message="Video recording fail"
-        ).model_dump_json()
-    except Exception as e:
-        app_logger.error(
-            f'{request.remote_addr} - "GET /video/digicam/makeVideo" - Error {e}'
-        )
-        return BasicResponse(
-            success=False, status_code=500, message=str(e)
-        ).model_dump_json()
-    finally:
-        camera.close_program()
-
-
 @bp_video.route("/video/digicam/startVideo", methods=["GET"])
 # @jwt_required()
 @cross_origin()
@@ -93,11 +53,20 @@ def digicam_start_video() -> str:
     # Log the request
     app_logger.info(f'{request.remote_addr} - "GET /video/digicam/startVideo"')
 
+    if not camera.is_camera():
+        app_logger.error(f'{request.remote_addr} - "GET /video/digicam/startVideo" - ERROR - Isn\'t a camera connected')
+        return BasicResponse(
+            success=False,
+            status_code=400,
+            message="Camera not connected",
+        ).model_dump_json()
+
     if not camera.is_running():
         app_logger.warning(
-            f'{request.remote_addr} - "GET /video/digicam/startVideo" - digiCam isnt running'
+            f'{request.remote_addr} - "GET /video/digicam/startVideo" - digiCam isn\'t running'
         )
         camera.run_digicam()
+
     try:
         camera_response = camera.start_recording()
         if camera_response.success:
@@ -175,6 +144,14 @@ def digicam_preview():
     """
     # Log the request
     app_logger.info(f'{request.remote_addr} - "GET /video/digicam/preview"')
+
+    if not camera.is_camera():
+        app_logger.error(f'{request.remote_addr} - "GET /video/digicam/preview" - ERROR - Isn\'t a camera connected')
+        return BasicResponse(
+            success=False,
+            status_code=400,
+            message="Camera not connected",
+        ).model_dump_json()
 
     try:
         if not camera.is_running():
