@@ -7,7 +7,6 @@ import psutil
 from api.config.backend_config import BasicCameraConfig
 from api.log import app_logger
 from api.responses.basic_responses import BasicResponse, DataResponse
-from api.utils.files import check_for_new_files
 
 
 class Camera:
@@ -48,6 +47,15 @@ class Camera:
         # Camera name
         self.is_plug: bool = self.is_camera()
 
+    def __set_cmd(self, command: str, parameter: str) -> BasicResponse:
+        """
+        Run a cmd command for set a parameter using digiCamController
+        @command: Command to run.
+        @parameter: Value to set on camera.
+        @return: A BasicResponse with the status of the cnd,
+        """
+        # TODO: implement this method.
+
     def is_running(self) -> bool:
         """
         Check if the program is running.
@@ -73,11 +81,28 @@ class Camera:
             app_logger.error(f"digiCamControl: @{self.exeDir} - Status: {e}")
             return False
 
-    def is_connected(self) -> bool:
-        """
-        Check if the camera is connected using the OpenCv library.
-        """
-        # TODO: Implement this method
+    def is_camera(self):
+        try:
+            # Start the live view window
+            time.sleep(5)
+            cmd = [
+                os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
+                "/c",
+                "list",
+                "cameras",
+            ]
+            response_cmd = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
+            response_cmd = str(response_cmd.stdout)
+            if "no camera is connected" in response_cmd or "response:null" in response_cmd:
+                return False
+            elif '"_??_pcistor"' in response_cmd:
+                return False
+            elif "EOS" in response_cmd:
+                return True
+            else:
+                return False
+        except (Exception or IOError):
+            return False
 
     def run_digicam(self) -> BasicResponse:
         """
@@ -172,36 +197,37 @@ class Camera:
         :param config: Configuration of the camera as a BasicCameraConfig object.
         :return: BasicResponse indicating the success of the operation with a message.
         """
-        try:
-            self.set_iso(config.iso)
-            self.set_aperture(config.aperture)
-            self.set_exposure_comp(config.exposure_comp)
-            self.set_shutterspeed(config.shutter_speed)
-            self.set_autofocus(config.autofocus)
-            self.set_compression(config.compression)
-            self.set_whitebalance(config.white_balance)
-            self.set_counter(config.counter)
-            self.set_image_name(config.image_name)
-            self.set_transfer(config.transfer_mode)
-            self.set_folder(config.storage_path)
-
-            # Log the configuration of the camera as a dict
-            app_logger.info(f"Camera configuration: {config.model_dump()}")
-
-            return BasicResponse(
-                success=True,
-                status_code=200,
-                message="Camera configuration successful",
-            )
-        except Exception as e:
-            # Log the configuration of the camera as a dict
-            app_logger.error(f"Camera configuration failed: {e}")
-
-            return BasicResponse(
-                success=False,
-                status_code=500,
-                message="Camera configuration failed",
-            )
+        # try:
+        #     self.set_iso(config.iso)
+        #     self.set_aperture(config.aperture)
+        #     self.set_exposure_comp(config.exposure_comp)
+        #     self.set_shutterspeed(config.shutter_speed)
+        #     self.set_autofocus(config.autofocus)
+        #     self.set_compression(config.compression)
+        #     self.set_whitebalance(config.white_balance)
+        #     self.set_counter(config.counter)
+        #     self.set_image_name(config.image_name)
+        #     self.set_transfer(config.transfer_mode)
+        #     self.set_folder(config.storage_path)
+        #
+        #     # Log the configuration of the camera as a dict
+        #     app_logger.info(f"Camera configuration: {config.model_dump()}")
+        #
+        #     return BasicResponse(
+        #         success=True,
+        #         status_code=200,
+        #         message="Camera configuration successful",
+        #     )
+        # except Exception as e:
+        #     # Log the configuration of the camera as a dict
+        #     app_logger.error(f"Camera configuration failed: {e}")
+        #
+        #     return BasicResponse(
+        #         success=False,
+        #         status_code=500,
+        #         message="Camera configuration failed",
+        #     )
+        # TODO: implement the configuration logic
 
     def capture(self, location: str = None) -> BasicResponse:
         """
@@ -254,36 +280,6 @@ class Camera:
                 success=False,
                 status_code=500,
                 message=f"Camera: Image capture failed - Error: {e}",
-            )
-
-    def capture_video(
-            self, location: str = None, duration: float = 420
-    ) -> BasicResponse:
-        """
-        Takes a video - filename and location can be specified in string location, otherwise the default will be used.
-        :param location: Location and filename of the video to be saved.
-        :param duration: Duration of the video in seconds. Default = 420
-        :return: a DataResponse indicating the success of the operation with a message and the path of the video.
-        """
-        try:
-            self.show_live_view()
-            self.run_cmd("do StartRecord")
-            time.sleep(duration)
-            self.run_cmd("do StopRecord")
-            self.run_cmd("do LiveViewWnd_Hide")
-
-            if check_for_new_files(location):
-                app_logger.info("Camera: Video recorded successfully")
-                return DataResponse(
-                    success=True,
-                    status_code=200,
-                    message=f"Video capture successfully",
-                    data={"path": location},
-                )
-        except (Exception, IOError) as e:
-            app_logger.error(f"Camera: Video recording fail: {e}")
-            return BasicResponse(
-                sucess=True, status_code=200, message=f"Video recording fail: {e}"
             )
 
     def start_recording(self) -> BasicResponse:
@@ -426,26 +422,3 @@ class Camera:
         :return:
         """
         self.__set_cmd("session.Counter", str(counter))
-
-    def is_camera(self):
-        try:
-            # Start the live view window
-            time.sleep(5)
-            cmd = [
-                os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
-                "/c",
-                "list",
-                "cameras",
-            ]
-            response_cmd = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
-            response_cmd = str(response_cmd.stdout)
-            if "no camera is connected" in response_cmd or "response:null" in response_cmd:
-                return False
-            elif '"_??_pcistor"' in response_cmd:
-                return False
-            elif "EOS" in response_cmd:
-                return True
-            else:
-                return False
-        except Exception:
-            return False
