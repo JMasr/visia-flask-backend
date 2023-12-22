@@ -93,7 +93,10 @@ class Camera:
             ]
             response_cmd = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
             response_cmd = str(response_cmd.stdout)
-            if "no camera is connected" in response_cmd or "response:null" in response_cmd:
+            if (
+                "no camera is connected" in response_cmd
+                or "response:null" in response_cmd
+            ):
                 return False
             elif '"_??_pcistor"' in response_cmd:
                 return False
@@ -101,7 +104,7 @@ class Camera:
                 return True
             else:
                 return False
-        except (Exception or IOError):
+        except Exception or IOError:
             return False
 
     def run_digicam(self) -> BasicResponse:
@@ -237,7 +240,7 @@ class Camera:
         """
         if location is None:
             image_name = (
-                    self.config.image_name + "_" + time.strftime("%Y%m%d_%H%M%S") + ".jpg"
+                self.config.image_name + "_" + time.strftime("%Y%m%d_%H%M%S") + ".jpg"
             )
             location = os.path.join(self.config.storage_path, image_name)
         else:

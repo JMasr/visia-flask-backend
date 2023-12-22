@@ -29,11 +29,11 @@ class LogTypes(Enum):
 
 class BasicLogger:
     def __init__(
-            self,
-            log_file: str,
-            log_name: str = "Visia-BackEnd_Logger",
-            max_log_size: int = (5 * 1024 * 1024),
-            backup_count: int = 3,
+        self,
+        log_file: str,
+        log_name: str = "Visia-BackEnd_Logger",
+        max_log_size: int = (5 * 1024 * 1024),
+        backup_count: int = 3,
     ):
         self.logger = logging.getLogger(log_name)
         self.logger.setLevel(logging.INFO)

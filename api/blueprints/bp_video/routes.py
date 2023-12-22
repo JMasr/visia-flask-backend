@@ -54,7 +54,9 @@ def digicam_start_video() -> str:
     app_logger.info(f'{request.remote_addr} - "GET /video/digicam/startVideo"')
 
     if not camera.is_camera():
-        app_logger.error(f'{request.remote_addr} - "GET /video/digicam/startVideo" - ERROR - Isn\'t a camera connected')
+        app_logger.error(
+            f'{request.remote_addr} - "GET /video/digicam/startVideo" - ERROR - Isn\'t a camera connected'
+        )
         return BasicResponse(
             success=False,
             status_code=400,
@@ -146,7 +148,9 @@ def digicam_preview():
     app_logger.info(f'{request.remote_addr} - "GET /video/digicam/preview"')
 
     if not camera.is_camera():
-        app_logger.error(f'{request.remote_addr} - "GET /video/digicam/preview" - ERROR - Isn\'t a camera connected')
+        app_logger.error(
+            f'{request.remote_addr} - "GET /video/digicam/preview" - ERROR - Isn\'t a camera connected'
+        )
         return BasicResponse(
             success=False,
             status_code=400,
@@ -177,9 +181,9 @@ def digicam_preview():
 
                 # Way for the video transferring
                 if check_for_new_files(
-                        path_folder=file_config.uploads_path,
-                        previous_files=file_config.upload_files,
-                        timer_seconds=120,
+                    path_folder=file_config.uploads_path,
+                    previous_files=file_config.upload_files,
+                    timer_seconds=120,
                 ):
                     video_path: str = file_config.get_newest_file()
                     response = send_video_frame_as_json(video_path)

@@ -36,9 +36,9 @@ class BackUp:
             backup_amount = len(backup_files)
 
             if (
-                    backup_amount == 0
-                    or backup_amount < self.backup_by_day
-                    or backup_amount < self.backup_count
+                backup_amount == 0
+                or backup_amount < self.backup_by_day
+                or backup_amount < self.backup_count
             ):
                 response = BasicResponse(
                     success=True,
