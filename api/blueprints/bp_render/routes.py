@@ -79,8 +79,7 @@ def get_render_video():
     :return: a redirection to the VideoRecording Frontend service.
     """
     app_logger.info(f'{request.remote_addr} - "GET /video" -')
-    try:
-        # Get data from request
+    try:        # Get data from request
         record_data.crd_id = request.args.get("crd", "UNK")
         record_data.ov = request.args.get("ov", "UNK")
         # Add a log
