@@ -28,6 +28,21 @@ class LogTypes(Enum):
 
 
 class BasicLogger:
+    """
+    Basic logger class that logs messages to the console and a file.
+
+    :param log_file: Path to the log file.
+    :type log_file: str
+    :param log_name: Name of the logger.
+    :type log_name: str
+    :param max_log_size: Maximum log file size.
+    :type max_log_size: int
+    :param backup_count: Number of log files to keep.
+    :type backup_count: int
+    :return: Basic logger object.
+    :rtype: BasicLogger
+    """
+
     def __init__(
         self,
         log_file: str,
@@ -57,4 +72,10 @@ class BasicLogger:
         self.logger.addHandler(console_handler)
 
     def get_logger(self):
+        """
+        Returns the logger object.
+
+        :return: Logger object.
+        :rtype: logging.Logger
+        """
         return self.logger
