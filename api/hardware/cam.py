@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import time
 
@@ -84,7 +85,6 @@ class Camera:
     def is_camera(self):
         try:
             # Start the live view window
-            time.sleep(5)
             cmd = [
                 os.path.join(self.exeDir, "CameraControlRemoteCmd.exe"),
                 "/c",
@@ -93,15 +93,19 @@ class Camera:
             ]
             response_cmd = subprocess.run(cmd, cwd=self.exeDir, capture_output=True)
             response_cmd = str(response_cmd.stdout)
-            if (
+
+            # Pattern to get the response
+            pattern = r'response:\["([^"]+)"\]'
+            match = re.search(pattern, response_cmd)
+            if match:
+                return True
+            elif (
                 "no camera is connected" in response_cmd
                 or "response:null" in response_cmd
             ):
                 return False
             elif '"_??_pcistor"' in response_cmd:
                 return False
-            elif "EOS" in response_cmd:
-                return True
             else:
                 return False
         except Exception or IOError:
