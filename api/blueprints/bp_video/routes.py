@@ -27,6 +27,7 @@ bp_video = Blueprint("bp_video", __name__)
 # Data Handler Section
 file_config = BasicFileConfig()
 file_config.update_upload_files()
+file_config.delete_all_files()
 
 # Set the secret key to enable JWT authentication
 security_config = BasicSecurityConfig(
@@ -171,7 +172,7 @@ def digicam_preview():
             )
 
             file_config.update_upload_files()
-            time.sleep(1.5)
+            time.sleep(3)
             camera_response = camera.stop_recording()
 
             if camera_response.success:
